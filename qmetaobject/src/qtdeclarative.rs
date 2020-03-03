@@ -873,3 +873,41 @@ struct Rust_QQmlExtensionPlugin : RustObject<QQmlExtensionPlugin> {
 };
 
 }}
+
+
+/// A QObject-like trait to inherit from QQuickPaintedItem.
+///
+/// Work in progress
+pub trait QQuickPaintedItem: QQuickItem {
+    #[doc(hidden)]
+    fn get_object_description() -> &'static QObjectDescription
+    where
+        Self: Sized,
+    {
+        unsafe {
+            &*cpp!([]-> *const QObjectDescription as "RustObjectDescription const*" {
+            return rustObjectDescription<Rust_QQuickPaintedItem>();
+        } )
+        }
+    }
+
+    /// Called to repaint the QML widget.
+    fn paint(&mut self, _painter: *mut c_void) { }
+}
+
+cpp! {{
+#include <qmetaobject_rust.hpp>
+#include <QtQuick/QQuickPaintedItem>
+#include <QtGui/QPen>
+#include <QtGui/QPainter>
+struct Rust_QQuickPaintedItem : RustObject<QQuickPaintedItem> {
+    void paint(QPainter *painter) override
+    {
+        rust!(Rust_QQuickPaintedItem_paint[rust_object : QObjectPinned<dyn QQuickPaintedItem> as "TraitObject",
+                                           painter : *mut c_void as "QPainter*"] {
+            rust_object.borrow_mut().paint(painter);
+        });
+    }
+};
+
+}} 
