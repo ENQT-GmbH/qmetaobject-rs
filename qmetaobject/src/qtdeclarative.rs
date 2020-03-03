@@ -893,7 +893,17 @@ pub trait QQuickPaintedItem: QQuickItem {
 
     /// Called to repaint the QML widget.
     fn paint(&mut self, _painter: *mut c_void) { }
-}
+
+    /// Schedules a redraw of the area covered by this item.
+    fn update(&mut self) {
+        let obj_ptr = self.get_cpp_object();
+        unsafe {
+            cpp!([obj_ptr as "QQuickPaintedItem*"] {
+                obj_ptr->update();
+            });
+        }
+    }
+ }
 
 cpp! {{
 #include <qmetaobject_rust.hpp>
