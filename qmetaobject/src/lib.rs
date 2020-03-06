@@ -281,7 +281,19 @@ pub trait QObject {
             return rustObjectDescription<RustObject<QObject>>();
         } ) }
     }
+
+    /// Returns a reference to a QObject stored in an QVariant.
+    unsafe fn from_qvariant<'a>(qv: &'a QVariant) -> QObjectPinned<'a, Self> 
+    where 
+        Self: Sized 
+    {
+        let self_ = cpp!{[qv as "const QVariant*"] -> *mut c_void as "QObject*" {
+            return qv->value<QObject *>();
+        }};
+        Self::get_from_cpp(self_)
+    }    
 }
+
 impl dyn QObject {
     /// Creates a C++ object and construct a QVariant containing a pointer to it.
     ///
@@ -295,7 +307,6 @@ impl dyn QObject {
             return QVariant::fromValue(self_);
         }}
     }
-
 
     /// See Qt documentation for QObject::destroyed
     pub fn destroyed_signal() -> CppSignal<fn()> {
