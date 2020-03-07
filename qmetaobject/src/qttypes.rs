@@ -22,6 +22,7 @@ use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
 use std::os::raw::c_char;
 use std::str::Utf8Error;
+use std::mem::transmute;
 
 #[cfg(feature = "chrono_qdatetime")]
 use chrono::prelude::*;
@@ -591,6 +592,21 @@ impl QVariantList {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    pub fn iter<'a>(&'a self) -> QVariantListIterator<'a> {
+        QVariantListIterator {
+            list: self,
+            index: 0,
+            size: self.len(),
+        }        
+    }
+    pub fn iter_mut<'a>(&'a mut self) -> QVariantListIteratorMut<'a> {
+        let size = self.len();
+        QVariantListIteratorMut {
+            list: self,
+            index: 0,
+            size,
+        }        
+    }    
 }
 
 impl Index<usize> for QVariantList {
@@ -626,6 +642,26 @@ impl<'a> Iterator for QVariantListIterator<'a> {
         } else {
             self.index += 1;
             Some(&self.list[self.index - 1])
+        }
+    }
+}
+
+/// Iternal class used to mutably iterate over a QVariantList
+pub struct QVariantListIteratorMut<'a> {
+    list: &'a mut QVariantList,
+    index: usize,
+    size: usize,
+}
+
+impl<'a> Iterator for QVariantListIteratorMut<'a> {
+    type Item = &'a mut QVariant;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.size {
+            None
+        } else {
+            self.index += 1;
+            let entry = &mut self.list[self.index - 1];
+            Some(unsafe { transmute(entry) })
         }
     }
 }
