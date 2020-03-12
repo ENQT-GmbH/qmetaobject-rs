@@ -903,7 +903,23 @@ pub trait QQuickPaintedItem: QQuickItem {
             });
         }
     }
- }
+
+    /// The width of this item.
+    fn width(&self) -> f64 {
+        let obj_ptr = self.get_cpp_object();
+        cpp! {unsafe [obj_ptr as "QQuickPaintedItem*"] -> f64 as "double" {
+            return obj_ptr->width();
+        }}        
+    }
+
+    /// The height of this item.
+    fn height(&self) -> f64 {
+        let obj_ptr = self.get_cpp_object();
+        cpp! {unsafe [obj_ptr as "QQuickPaintedItem*"] -> f64 as "double" {
+            return obj_ptr->height();
+        }}        
+    }    
+}
 
 cpp! {{
 #include <qmetaobject_rust.hpp>
