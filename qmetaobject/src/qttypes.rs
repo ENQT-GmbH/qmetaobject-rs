@@ -16,13 +16,14 @@ OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 extern crate std;
-use std::convert::From;
+use std::convert::{TryFrom, From};
 use std::fmt::Display;
 use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
 use std::os::raw::c_char;
 use std::str::Utf8Error;
 use std::mem::transmute;
+use std::fmt;
 
 #[cfg(feature = "chrono_qdatetime")]
 use chrono::prelude::*;
@@ -479,6 +480,18 @@ impl std::fmt::Debug for QString {
         write!(f, "{}", self)
     }
 }
+
+
+/// The QVariant cannot be converted into the specified type.
+#[derive(Debug)]
+pub struct CannotConvertQVariant ();
+impl fmt::Display for CannotConvertQVariant {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Cannot convert QVariant to specified type")
+    }
+}
+impl std::error::Error for CannotConvertQVariant {}
+
 cpp_class!(
 /// Wrapper around a QVariant
 #[derive(PartialEq)] pub unsafe struct QVariant as "QVariant");
@@ -494,29 +507,141 @@ impl QVariant {
         unsafe { cpp!([self as "const QVariant*"] -> bool as "bool" { return self->toBool(); }) }
     }
 }
+
+
 impl From<QString> for QVariant {
     fn from(a: QString) -> QVariant {
         unsafe { cpp!([a as "QString"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QString {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QString::from("");
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QString"] -> bool as "bool" { 
+                if (a.canConvert<QString>()) {
+                    v = a.value<QString>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<QByteArray> for QVariant {
     fn from(a: QByteArray) -> QVariant {
         unsafe { cpp!([a as "QByteArray"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QByteArray {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QByteArray::from(&[] as &[u8]);
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QByteArray"] -> bool as "bool" { 
+                if (a.canConvert<QByteArray>()) {
+                    v = a.value<QByteArray>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<QDate> for QVariant {
     fn from(a: QDate) -> QVariant {
         unsafe { cpp!([a as "QDate"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QDate {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QDate::from_y_m_d(2000, 1, 1);
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QDate"] -> bool as "bool" { 
+                if (a.canConvert<QDate>()) {
+                    v = a.value<QDate>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<QTime> for QVariant {
     fn from(a: QTime) -> QVariant {
         unsafe { cpp!([a as "QTime"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QTime {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QTime::from_h_m_s_ms(0, 0, None, None);
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QTime"] -> bool as "bool" { 
+                if (a.canConvert<QTime>()) {
+                    v = a.value<QTime>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
+
 impl From<QDateTime> for QVariant {
     fn from(a: QDateTime) -> QVariant {
         unsafe { cpp!([a as "QDateTime"] -> QVariant as "QVariant" { return QVariant(a); }) }
+    }
+}
+impl TryFrom<QVariant> for QDateTime {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QDateTime::from_date(QDate::from_y_m_d(2000, 1, 1));
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QDateTime"] -> bool as "bool" { 
+                if (a.canConvert<QDateTime>()) {
+                    v = a.value<QDateTime>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
     }
 }
 
@@ -525,37 +650,190 @@ impl From<QUrl> for QVariant {
         unsafe { cpp!([a as "QUrl"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QUrl {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = QUrl::from_user_input(QString::from(""));
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QUrl"] -> bool as "bool" { 
+                if (a.canConvert<QUrl>()) {
+                    v = a.value<QUrl>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
 
 impl From<QVariantList> for QVariant {
     fn from(a: QVariantList) -> QVariant {
         unsafe { cpp!([a as "QVariantList"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for QVariantList {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v: QVariantList = std::iter::empty::<bool>().collect();
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "QVariantList"] -> bool as "bool" { 
+                if (a.canConvert<QVariantList>()) {
+                    v = a.value<QVariantList>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<i32> for QVariant {
     fn from(a: i32) -> QVariant {
         unsafe { cpp!([a as "int"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for i32 {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = 0;
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "int"] -> bool as "bool" { 
+                if (a.canConvert<int>()) {
+                    v = a.value<int>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<u32> for QVariant {
     fn from(a: u32) -> QVariant {
         unsafe { cpp!([a as "uint"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for u32 {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = 0;
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "uint"] -> bool as "bool" { 
+                if (a.canConvert<uint>()) {
+                    v = a.value<uint>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<f32> for QVariant {
     fn from(a: f32) -> QVariant {
         unsafe { cpp!([a as "float"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for f32 {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = 0.0;
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "float"] -> bool as "bool" { 
+                if (a.canConvert<float>()) {
+                    v = a.value<float>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<f64> for QVariant {
     fn from(a: f64) -> QVariant {
         unsafe { cpp!([a as "double"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for f64 {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = 0.0;
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "double"] -> bool as "bool" { 
+                if (a.canConvert<double>()) {
+                    v = a.value<double>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl From<bool> for QVariant {
     fn from(a: bool) -> QVariant {
         unsafe { cpp!([a as "bool"] -> QVariant as "QVariant" { return QVariant(a); }) }
     }
 }
+impl TryFrom<QVariant> for bool {
+    type Error = CannotConvertQVariant;
+    fn try_from(a: QVariant) -> Result<Self, Self::Error> {
+        let mut v = false;
+        unsafe {
+            let okay = cpp!([a as "QVariant", mut v as "bool"] -> bool as "bool" { 
+                if (a.canConvert<bool>()) {
+                    v = a.value<bool>();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            if okay {
+                Ok(v)
+            } else {
+                Err(CannotConvertQVariant())
+            }
+        }
+    }
+}
+
 impl<'a, T> From<&'a T> for QVariant
 where
     T: Into<QVariant> + Clone,
@@ -762,6 +1040,24 @@ mod tests {
         assert!(qtime == QTime::from_h_m_s_ms(10, 30, Some(40), Some(100)));
         assert!(qtime != QTime::from_h_m_s_ms(10, 30, Some(40), None));
     }
+
+    #[test]
+    fn test_qvariant_qstring() {
+        let ts = "TestString123".to_owned();
+        let qs = QString::from(ts.clone());
+        let qv = QVariant::from(qs);
+        let qs2 = QString::try_from(qv).unwrap();
+        let ts2: String = qs2.into();
+        assert_eq!(ts, ts2);
+    }
+
+    #[test]
+    fn test_qvariant_u32() {
+        let v = 123;
+        let qv = QVariant::from(v);
+        let v2 = i32::try_from(qv).unwrap();
+        assert_eq!(v, v2);
+    }    
 }
 
 cpp_class!(
