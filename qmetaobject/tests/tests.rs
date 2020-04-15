@@ -194,6 +194,43 @@ fn register_type() {
 }
 
 #[derive(Default, QObject)]
+#[QObjectInit]
+struct RegisteredObjWithInit {
+    base: qt_base_class!(trait QObject),
+    value: qt_property!(u32),
+}
+
+impl QObjectInit for RegisteredObjWithInit {
+    fn init(&mut self) {
+        self.value = 11;
+    }
+}
+
+#[test]
+fn register_type_with_init() {
+    qml_register_type::<RegisteredObjWithInit>(
+        CStr::from_bytes_with_nul(b"TestRegister\0").unwrap(),
+        1,
+        0,
+        CStr::from_bytes_with_nul(b"RegisteredObjWithInit\0").unwrap(),
+    );
+
+    let obj = MyObject::default(); // not used but needed for do_test
+    assert!(do_test(
+        obj,
+        "import TestRegister 1.0;
+        Item {
+            RegisteredObjWithInit {
+                id: test;
+            }
+            function doTest() {
+                return test.value === 11;
+            }
+        }"
+    ));
+}
+
+#[derive(Default, QObject)]
 struct RegisterSingletonInstanceObj {
     base: qt_base_class!(trait QObject),
     value: u32,
@@ -226,13 +263,14 @@ fn register_singleton_instance() {
 }
 
 #[derive(QObject, Default)]
+#[QObjectInit]
 struct RegisterSingletonTypeObj {
     base: qt_base_class!(trait QObject),
     value: u32,
     get_value2: qt_method!(fn get_value2(&self) -> u32 { self.value } ),
 }
 
-impl QSingletonInit for RegisterSingletonTypeObj {
+impl QObjectInit for RegisterSingletonTypeObj {
     fn init(&mut self) {
         self.value = 456;
     }

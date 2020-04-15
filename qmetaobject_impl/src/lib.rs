@@ -59,7 +59,7 @@ fn get_crate(input: &syn::DeriveInput) -> impl quote::ToTokens {
 }
 
 /// Implementation of #[derice(QObject)]
-#[proc_macro_derive(QObject, attributes(QMetaObjectCrate, qt_base_class))]
+#[proc_macro_derive(QObject, attributes(QMetaObjectCrate, QObjectInit, qt_base_class))]
 pub fn qobject_impl(input: TokenStream) -> TokenStream {
     qobject_impl::generate(input, true)
 }

@@ -318,6 +318,17 @@ fn map_method_parameters2(
         .collect()
 }
 
+fn has_init_attr(input: &syn::DeriveInput) -> bool {
+    for i in input.attrs.iter() {
+        if let Ok(x) = i.parse_meta() {
+            if x.path().is_ident("QObjectInit") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
@@ -331,6 +342,7 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
     let mut plugin_iid: Option<syn::LitStr> = None;
 
     let crate_ = super::get_crate(&ast);
+    let has_init_attr = has_init_attr(&ast);
     let mut base: syn::Ident = parse_quote!(QGadget);
     let mut base_prop: syn::Ident = parse_quote!(missing_base_class_property);
     let mut has_base_property = false;
@@ -844,6 +856,22 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
         quote! {}
     };
 
+    let init_func = if is_qobject {
+        if has_init_attr {
+            quote! {
+                fn init(&mut self) {
+                    <Self as QObjectInit>::init(self)
+                }
+            }
+        } else {
+            quote! {
+                fn init(&mut self) {}
+            }        
+        }
+    } else {
+        quote! {}
+    };
+
     let trait_name = if is_qobject {
         quote! { QObject }
     } else {
@@ -895,6 +923,8 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
             }
 
             #qobject_spec_func
+            
+            #init_func
 
         }
 

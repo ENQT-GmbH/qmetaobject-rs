@@ -292,6 +292,9 @@ pub trait QObject {
         }};
         Self::get_from_cpp(self_)
     }    
+
+    /// Initializes the QML object after C++ object creation.
+    fn init(&mut self);
 }
 
 impl dyn QObject {
@@ -329,6 +332,18 @@ impl dyn QObject {
             return &QObject::objectNameChanged;
         }))}
     }
+}
+
+/// Initialization of an QML object.
+pub trait QObjectInit {
+    /// Initialize the QML object.
+    ///
+    /// Will be called on a default-constructed object after the C++ object
+    /// has been created.
+    ///
+    /// # Panics
+    /// The process will be aborted when the method panics.
+    fn init(&mut self); 
 }
 
 cpp_class!(unsafe struct QPointerImpl as "QPointer<QObject>");
