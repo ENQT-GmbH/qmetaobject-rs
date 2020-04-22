@@ -344,6 +344,20 @@ impl QDateTime {
     }
 }
 
+#[cfg(feature = "chrono_qdatetime")]
+impl From<NaiveDateTime> for QDateTime {
+    fn from(a: NaiveDateTime) -> QDateTime {
+        QDateTime::from_date_time_local_timezone(a.date().into(), a.time().into())
+    }
+}
+
+#[cfg(feature = "chrono_qdatetime")]
+impl Into<NaiveDateTime> for QDateTime {
+    fn into(self) -> NaiveDateTime {
+        NaiveDateTime::new(self.get_date().into(), self.get_time().into())
+    }
+}
+
 #[test]
 fn test_qdatetime_from_date() {
     let qdate = QDate::from_y_m_d(2019, 10, 22);
