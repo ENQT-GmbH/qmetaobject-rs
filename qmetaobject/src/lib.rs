@@ -21,22 +21,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     # Example:
 
     ```
-    extern crate qmetaobject;
-    use qmetaobject::*;
     #[macro_use] extern crate cstr;
+    extern crate qmetaobject;
+
+    use qmetaobject::*;
 
     // The `QObject` custom derive macro allows to expose a class to Qt and QML
     #[derive(QObject,Default)]
     struct Greeter {
         // Specify the base class with the qt_base_class macro
-        base : qt_base_class!(trait QObject),
-        // Decalare `name` as a property usable from Qt
-        name : qt_property!(QString; NOTIFY name_changed),
+        base: qt_base_class!(trait QObject),
+        // Declare `name` as a property usable from Qt
+        name: qt_property!(QString; NOTIFY name_changed),
         // Declare a signal
-        name_changed : qt_signal!(),
+        name_changed: qt_signal!(),
         // And even a slot
-        compute_greetings : qt_method!(fn compute_greetings(&self, verb : String) -> QString {
-            return (verb + " " + &self.name.to_string()).into()
+        compute_greetings: qt_method!(fn compute_greetings(&self, verb: String) -> QString {
+            format!("{} {}", verb, self.name.to_string()).into()
         })
     }
 
@@ -48,21 +49,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     # return; // We can't create a window in the CI
         // (Here the QML code is inline, but one can also load from a file)
         engine.load_data(r#"
-            import QtQuick 2.6;
-            import QtQuick.Window 2.0;
-            import Greeter 1.0  // import our Rust classes
+            import QtQuick 2.6
+            import QtQuick.Window 2.0
+            // Import our Rust classes
+            import Greeter 1.0
+
             Window {
-                visible: true;
-                Greeter { //  Instentiate the rust struct
+                visible: true
+                // Instantiate the rust struct
+                Greeter {
                     id: greeter;
-                    name: 'World'; // set a property
+                    // Set a property
+                    name: "World"
                 }
                 Text {
-                    anchors.centerIn: parent;
+                    anchors.centerIn: parent
                     // Call a method
-                    text: greeter.compute_greetings('hello');
+                    text: greeter.compute_greetings("hello")
                 }
-            }"#.into());
+            }
+        "#.into());
         engine.exec();
     }
     ```
@@ -86,6 +92,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     # use qmetaobject::QMetaType;
     #[derive(Default, Clone)]
     struct MyPoint(u32, u32);
+
     impl QMetaType for MyPoint {};
     ```
 
@@ -102,7 +109,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     # Threading
 
-    The QML engine only runs in a single thread. And probably all the QObject needs to be living
+    The QML engine only runs in a single thread. And probably all the `QObject`s needs to be living
     in the Qt thread. But you can use the [queued_callback](fn.queued_callback.html) function to
     create callback that can be called from any thread and are going to run in the Qt thread.
 
@@ -113,19 +120,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     # use qmetaobject::*;
     #[derive(QObject,Default)]
     struct MyAsyncObject {
-        base : qt_base_class!(trait QObject),
-        result : qt_property!(QString; NOTIFY result_changed),
-        result_changed : qt_signal!(),
-        recompute_result : qt_method!(fn recompute_result(&self, name : String) {
+        base: qt_base_class!(trait QObject),
+        result: qt_property!(QString; NOTIFY result_changed),
+        result_changed: qt_signal!(),
+        recompute_result: qt_method!(fn recompute_result(&self, name: String) {
             let qptr = QPointer::from(&*self);
-            let set_value = qmetaobject::queued_callback(move |val : QString| {
+            let set_value = qmetaobject::queued_callback(move |val: QString| {
                 qptr.as_pinned().map(|self_| {
                     self_.borrow_mut().result = val;
                     self_.borrow().result_changed();
                 });
             });
             std::thread::spawn(move || {
-                // do stuff asynchroniously ...
+                // do stuff asynchronously ...
                 let r = QString::from("Hello ".to_owned() + &name);
                 set_value(r);
             }).join();
@@ -142,7 +149,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     # engine.exec();
     # assert_eq!(obj.borrow().result, QString::from("Hello World"));
     ```
-
 */
 
 #![recursion_limit = "10240"]
@@ -158,8 +164,8 @@ extern crate qmetaobject_impl;
 #[doc(hidden)]
 pub use qmetaobject_impl::*;
 
-/* In order to be able to use the lazy_static macro from the QObject custom derive, we re-export
-it under a new name qmetaobject_lazy_static */
+// In order to be able to use the lazy_static macro from the QObject custom derive, we re-export
+// it under a new name qmetaobject_lazy_static.
 extern crate lazy_static;
 #[allow(unused_imports)]
 #[doc(hidden)]
@@ -168,14 +174,31 @@ pub use lazy_static::*;
 #[macro_export]
 macro_rules! qmetaobject_lazy_static { ($($t:tt)*) => { lazy_static!($($t)*) } }
 
-//#[macro_use]
-//extern crate bitflags;
-
 use std::cell::RefCell;
 use std::os::raw::{c_char, c_void};
 
-pub mod qttypes;
+pub use itemmodel::*;
+pub use listmodel::*;
+pub use crate::log::*;
+pub use qtdeclarative::*;
+pub use qmetatype::*;
+pub use connections::RustSignal;
+pub use connections::{connect, CppSignal, SignalCppRepresentation};
+pub use qtquickcontrols2::*;
+pub use future::*;
 pub use qttypes::*;
+
+pub mod itemmodel;
+pub mod listmodel;
+pub mod log;
+pub mod qtdeclarative;
+pub mod qmetatype;
+pub mod qrc;
+pub mod connections;
+pub mod qtquickcontrols2;
+pub mod scenegraph;
+pub mod future;
+pub mod qttypes;
 
 cpp! {{
     #include <qmetaobject_rust.hpp>
@@ -185,30 +208,31 @@ cpp! {{
 pub struct QObjectCppWrapper {
     ptr: *mut c_void,
 }
+
 impl Drop for QObjectCppWrapper {
     fn drop(&mut self) {
         let ptr = self.ptr;
-        unsafe {
-            cpp!([ptr as "QObject*"] {
-                // The event 513 is catched by RustObject and deletes the object.
-                QEvent e(QEvent::Type(513));
-                if (ptr)
-                    ptr->event(&e);
-            })
-        };
+        cpp!(unsafe [ptr as "QObject *"] {
+            // The event 513 is caught by RustObject and deletes the object.
+            QEvent e = QEvent(QEvent::Type(QtJambi_EventType_DeleteOnMainThread));
+            if (ptr) {
+                ptr->event(&e);
+            }
+        });
     }
 }
+
 impl Default for QObjectCppWrapper {
     fn default() -> QObjectCppWrapper {
-        QObjectCppWrapper {
-            ptr: std::ptr::null_mut(),
-        }
+        QObjectCppWrapper { ptr: std::ptr::null_mut() }
     }
 }
+
 impl QObjectCppWrapper {
     pub fn get(&self) -> *mut c_void {
         self.ptr
     }
+
     pub fn set(&mut self, val: *mut c_void) {
         self.ptr = val;
     }
@@ -244,18 +268,22 @@ pub trait QObject {
 
     /// Returns a pointer to a meta object
     fn meta_object(&self) -> *const QMetaObject;
+
     /// Returns a pointer to a meta object
     fn static_meta_object() -> *const QMetaObject
     where
         Self: Sized;
+
     /// return a C++ pointer to the QObject*  (can be null if not yet initialized)
     fn get_cpp_object(&self) -> *mut c_void;
+
     /// Construct the C++ Object.
     ///
     /// Note, once this function is called, the object must not be moved in memory.
     unsafe fn cpp_construct(pined: &RefCell<Self>) -> *mut c_void
     where
         Self: Sized;
+
     /// Construct the C++ Object, suitable for callbacks to construct QML objects.
     unsafe fn qml_construct(
         pined: &RefCell<Self>,
@@ -263,10 +291,12 @@ pub trait QObject {
         extra_destruct: extern "C" fn(*mut c_void),
     ) where
         Self: Sized;
+
     /// Return the size of the C++ object
     fn cpp_size() -> usize
     where
         Self: Sized;
+
     /// Return a rust object belonging to a C++ object
     unsafe fn get_from_cpp<'a>(p: *mut c_void) -> QObjectPinned<'a, Self>
     where
@@ -276,10 +306,15 @@ pub trait QObject {
     // Copy/paste this code replacing QObject with the type.
 
     /// Returns a QObjectDescription for this type
-    fn get_object_description() -> &'static QObjectDescription where Self:Sized {
-        unsafe { &*cpp!([]-> *const QObjectDescription as "RustObjectDescription const*" {
-            return rustObjectDescription<RustObject<QObject>>();
-        } ) }
+    fn get_object_description() -> &'static QObjectDescription
+    where
+        Self: Sized,
+    {
+        unsafe {
+            &*cpp!([]-> *const QObjectDescription as "RustObjectDescription const *" {
+                return rustObjectDescription<RustObject<QObject>>();
+            })
+        }
     }
 
     /// Returns a reference to a QObject stored in an QVariant.
@@ -306,31 +341,38 @@ impl dyn QObject {
     /// QVariant is unsafe as it does not manage life time
     pub unsafe fn as_qvariant(&self) -> QVariant {
         let self_ = self.get_cpp_object();
-        cpp!{[self_ as "QObject*"] -> QVariant as "QVariant"  {
+        cpp! {[self_ as "QObject*"] -> QVariant as "QVariant"  {
             return QVariant::fromValue(self_);
         }}
     }
 
     /// See Qt documentation for QObject::destroyed
     pub fn destroyed_signal() -> CppSignal<fn()> {
-        unsafe { CppSignal::new(cpp!([] -> SignalCppRepresentation as "SignalCppRepresentation"  {
-            return &QObject::destroyed;
-        }))}
+        unsafe {
+            CppSignal::new(cpp!([] -> SignalCppRepresentation as "SignalCppRepresentation"  {
+                return &QObject::destroyed;
+            }))
+        }
     }
 
     /// See Qt documentation for QObject::setObjectName
     // FIXME. take self by special reference?  panic if cpp_object does not exist?
     pub fn set_object_name(&self, name: QString) {
         let self_ = self.get_cpp_object();
-        unsafe {cpp!([self_ as "QObject*", name as "QString"] {
-            if (self_) self_->setObjectName(std::move(name));
-        })}
+        unsafe {
+            cpp!([self_ as "QObject*", name as "QString"] {
+                if (self_) self_->setObjectName(std::move(name));
+            })
+        }
     }
+
     /// See Qt documentation for QObject::objectNameChanged
     pub fn object_name_changed_signal() -> CppSignal<fn(QString)> {
-        unsafe {CppSignal::new(cpp!([] -> SignalCppRepresentation as "SignalCppRepresentation"  {
-            return &QObject::objectNameChanged;
-        }))}
+        unsafe {
+            CppSignal::new(cpp!([] -> SignalCppRepresentation as "SignalCppRepresentation"  {
+                return &QObject::objectNameChanged;
+            }))
+        }
     }
 }
 
@@ -355,12 +397,12 @@ impl<T: QObject + ?Sized> QPointer<T> {
     /// Returns a pointer to the cpp object (null if it was deleted)
     pub fn cpp_ptr(&self) -> *mut c_void {
         let x = &self.0;
-        cpp!(unsafe [x as "QPointer<QObject>*"] -> *mut c_void as "QObject*" {
+        cpp!(unsafe [x as "QPointer<QObject> *"] -> *mut c_void as "QObject *" {
             return x->data();
         })
     }
 
-    /// Returns a reference to the opbject, or None if it was deleted
+    /// Returns a reference to the `QObject`, or None if it was deleted
     pub fn as_ref(&self) -> Option<&T> {
         let x = self.cpp_ptr();
         if x.is_null() {
@@ -376,8 +418,9 @@ impl<T: QObject + ?Sized> QPointer<T> {
         self.cpp_ptr().is_null()
     }
 }
+
 impl<T: QObject> QPointer<T> {
-    /// Returns a pinned reference to the opbject, or None if it was deleted
+    /// Returns a pinned reference to the QObject, or None if it was deleted
     pub fn as_pinned(&self) -> Option<QObjectPinned<T>> {
         let x = self.cpp_ptr();
         if x.is_null() {
@@ -393,9 +436,12 @@ impl<'a, T: QObject + ?Sized> From<&'a T> for QPointer<T> {
     /// The corresponding C++ object must have already been created.
     fn from(obj: &'a T) -> Self {
         let cpp_obj = obj.get_cpp_object();
-        QPointer(cpp!(unsafe [cpp_obj as "QObject *"] -> QPointerImpl  as "QPointer<QObject>" {
-            return cpp_obj;
-        }), obj as *const T)
+        QPointer(
+            cpp!(unsafe [cpp_obj as "QObject *"] -> QPointerImpl  as "QPointer<QObject>" {
+                return cpp_obj; // implicit constructor
+            }),
+            obj as *const T,
+        )
     }
 }
 
@@ -411,11 +457,12 @@ impl<T: QObject + ?Sized> Clone for QPointer<T> {
     }
 }
 
-/// Same as std::cell::RefMut,  but does not allow to move from
+/// Same as std::cell::RefMut, but does not allow to move from
 pub struct QObjectRefMut<'b, T: QObject + ?Sized + 'b> {
     old_value: *mut c_void,
     inner: std::cell::RefMut<'b, T>,
 }
+
 impl<'b, T: QObject + ?Sized> std::ops::Deref for QObjectRefMut<'b, T> {
     type Target = std::cell::RefMut<'b, T>;
 
@@ -424,12 +471,14 @@ impl<'b, T: QObject + ?Sized> std::ops::Deref for QObjectRefMut<'b, T> {
         &self.inner
     }
 }
+
 impl<'b, T: QObject + ?Sized> std::ops::DerefMut for QObjectRefMut<'b, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
+
 impl<'b, T: QObject + ?Sized + 'b> Drop for QObjectRefMut<'b, T> {
     #[inline]
     fn drop(&mut self) {
@@ -444,16 +493,18 @@ impl<'b, T: QObject + ?Sized + 'b> Drop for QObjectRefMut<'b, T> {
 /// A reference to a RefCell<T>, where T is a QObject, which does not move in memory
 #[repr(transparent)]
 pub struct QObjectPinned<'pin, T: QObject + ?Sized + 'pin>(&'pin RefCell<T>);
+
 impl<'pin, T: QObject + ?Sized + 'pin> Clone for QObjectPinned<'pin, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
+
 impl<'pin, T: QObject + ?Sized + 'pin> Copy for QObjectPinned<'pin, T> {}
 
 impl<'pin, T: QObject + ?Sized + 'pin> QObjectPinned<'pin, T> {
     /// Borrow the object
-    // FIXME: there are too many case for which we want re-entrency after borrowing
+    // FIXME: there are too many cases for which we want reentrance after borrowing
     //pub fn borrow(&self) -> std::cell::Ref<T> { self.0.borrow() }
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::should_implement_trait))]
     pub fn borrow(&self) -> &T {
@@ -461,15 +512,13 @@ impl<'pin, T: QObject + ?Sized + 'pin> QObjectPinned<'pin, T> {
     }
     pub fn borrow_mut(&self) -> QObjectRefMut<T> {
         let x = self.0.borrow_mut();
-        QObjectRefMut {
-            old_value: x.get_cpp_object(),
-            inner: x,
-        }
+        QObjectRefMut { old_value: x.get_cpp_object(), inner: x }
     }
     pub fn as_ptr(&self) -> *mut T {
         self.0.as_ptr()
     }
 }
+
 impl<'pin, T: QObject + ?Sized + 'pin> QObjectPinned<'pin, T> {
     /// Internal function used from the code generated by the QObject derive macro
     /// unsafe because one must ensure it does not move in memory
@@ -477,6 +526,7 @@ impl<'pin, T: QObject + ?Sized + 'pin> QObjectPinned<'pin, T> {
         QObjectPinned(inner)
     }
 }
+
 impl<'pin, T: QObject + 'pin> QObjectPinned<'pin, T> {
     /// Get the pointer ot the C++ Object, or crate it if it was not yet created
     pub fn get_or_create_cpp_object(self) -> *mut c_void {
@@ -491,11 +541,13 @@ impl<'pin, T: QObject + 'pin> QObjectPinned<'pin, T> {
 
 /// A wrapper around RefCell<T>, whose content cannot be move in memory
 pub struct QObjectBox<T: QObject + ?Sized>(Box<RefCell<T>>);
+
 impl<T: QObject> QObjectBox<T> {
     pub fn new(obj: T) -> Self {
         QObjectBox(Box::new(RefCell::new(obj)))
     }
 }
+
 impl<T: QObject + ?Sized> QObjectBox<T> {
     pub fn pinned(&self) -> QObjectPinned<T> {
         unsafe { QObjectPinned::new(&self.0) }
@@ -521,6 +573,7 @@ pub fn into_leaked_cpp_ptr<T: QObject>(obj: T) -> *mut c_void {
 pub trait QGadget {
     /// Returns a pointer to a meta object
     fn meta_object(&self) -> *const QMetaObject;
+
     /// Returns a pointer to a meta object
     fn static_meta_object() -> *const QMetaObject
     where
@@ -560,24 +613,40 @@ pub unsafe fn invoke_signal(
     a: &[*mut c_void],
 ) {
     let a = a.as_ptr();
-    cpp!([object as "QObject*", meta as "const QMetaObject*", id as "int", a as "void**"] {
-        if (!object) return;
+    cpp!([
+        object as "QObject *",
+        meta as "const QMetaObject *",
+        id as "int",
+        a as "void **"
+    ] {
+        if (!object) {
+            return;
+        }
         QMetaObject::activate(object, meta, id, a);
     })
 }
+
+/// Wrapper for `QMetaObject`'s private data's `StaticMetacallFunction` typedef.
+type StaticMetacallFunction = Option<extern "C" fn(
+    o: *mut c_void, // FIXME: should be QObject or something
+    c: u32,
+    idx: u32,
+    a: *const *mut c_void
+)>;
 
 /// Same as a C++ QMetaObject.
 #[doc(hidden)]
 #[repr(C)]
 pub struct QMetaObject {
-    pub superdata: *const QMetaObject,
+    // fields are slightly renamed from Qt to match Rust code style
+    pub super_data: *const QMetaObject,
     pub string_data: *const u8,
     pub data: *const u32,
-    pub static_metacall:
-        Option<extern "C" fn(o: *mut c_void, c: u32, idx: u32, a: *const *mut c_void)>,
-    pub r: *const c_void,
-    pub e: *const c_void,
+    pub static_metacall: StaticMetacallFunction,
+    pub meta_types: *const c_void,
+    pub extra_data: *const c_void,
 }
+
 unsafe impl Sync for QMetaObject {}
 unsafe impl Send for QMetaObject {}
 
@@ -622,12 +691,13 @@ macro_rules! qt_base_class {
 /// # #[macro_use] extern crate qmetaobject; use qmetaobject::QObject;
 /// #[derive(QObject)]
 /// struct Foo {
-///    base : qt_base_class!(trait QObject),
-///    foo : qt_property!(u32; NOTIFY foo_changed WRITE set_foo) ,
-///    foo_changed: qt_signal!()
+///    base: qt_base_class!(trait QObject),
+///    foo: qt_property!(u32; NOTIFY foo_changed WRITE set_foo),
+///    foo_changed: qt_signal!(),
 /// }
+///
 /// impl Foo {
-///    fn set_foo(&mut self, val : u32) { self.foo = val; }
+///    fn set_foo(&mut self, val: u32) { self.foo = val; }
 /// }
 /// ```
 #[macro_export]
@@ -647,15 +717,16 @@ macro_rules! qt_property {
 /// # #[macro_use] extern crate qmetaobject; use qmetaobject::QObject;
 /// #[derive(QObject)]
 /// struct Foo {
-///    base : qt_base_class!(trait QObject),
-///    defined_method : qt_method!(fn defined_method(&self, foo : u32) -> u32 {
+///    base: qt_base_class!(trait QObject),
+///    defined_method: qt_method!(fn defined_method(&self, foo: u32) -> u32 {
 ///       println!("contents goes here.");
 ///       return 42;
 ///    }),
-///    outofline_method : qt_method!(fn(&self, foo : u32)-> u32),
+///    out_of_line_method: qt_method!(fn(&self, foo: u32)-> u32),
 /// }
+///
 /// impl Foo {
-///    fn outofline_method(&mut self, foo : u32) -> u32 {
+///    fn out_of_line_method(&mut self, foo: u32) -> u32 {
 ///       println!("Or here.");
 ///       return 69;
 ///    }
@@ -676,19 +747,17 @@ macro_rules! qt_method {
 /// # #[macro_use] extern crate qmetaobject; use qmetaobject::QObject;
 /// #[derive(QObject)]
 /// struct Foo {
-///    base : qt_base_class!(trait QObject),
-///    my_signal : qt_signal!(xx: u32, yy: String),
+///    base: qt_base_class!(trait QObject),
+///    my_signal: qt_signal!(xx: u32, yy: String),
 /// }
-/// fn some_code(foo : &mut Foo) {
+///
+/// fn some_code(foo: &mut Foo) {
 ///    foo.my_signal(42, "42".into()); // emits the signal
 /// }
 /// ```
 #[macro_export]
 macro_rules! qt_signal {
-    ($($name:ident : $ty:ty),*) => { $crate::RustSignal<fn($($ty),*)> };
-    //() => { $crate::RustSignal0 };
-    //($a0:ident : $t0:ty) => { $crate::RustSignal1<$t0> };
-    //($a0:ident : $t0:ty, $a1:ident : $t1:ty) => { $crate::RustSignal2<$t0,$t1> };
+    ($( $name:ident : $ty:ty ),*) => { $crate::RustSignal<fn( $( $ty ),* )> };
 }
 
 /// Equivalent to the Q_PLUGIN_METADATA macro.
@@ -697,13 +766,16 @@ macro_rules! qt_signal {
 /// the IID
 ///
 /// ```
-/// # #[macro_use] extern crate qmetaobject; use qmetaobject::qtdeclarative::QQmlExtensionPlugin;
+/// # #[macro_use] extern crate qmetaobject;
+/// # use qmetaobject::qtdeclarative::QQmlExtensionPlugin;
 /// #[derive(Default, QObject)]
 /// struct MyPlugin {
 ///     base: qt_base_class!(trait QQmlExtensionPlugin),
 ///     plugin: qt_plugin!("org.qt-project.Qt.QQmlExtensionInterface/1.0")
 /// }
-/// # impl QQmlExtensionPlugin for MyPlugin { fn register_types(&mut self, uri : &std::ffi::CStr) { } }
+/// # impl QQmlExtensionPlugin for MyPlugin {
+/// #     fn register_types(&mut self, uri: &std::ffi::CStr) {}
+/// # }
 /// ```
 #[macro_export]
 macro_rules! qt_plugin {
@@ -712,23 +784,38 @@ macro_rules! qt_plugin {
 
 cpp! {{
     struct FnBoxWrapper {
+        /// Wrapped Box<dyn FnMut()>
         TraitObject fnbox;
+
         ~FnBoxWrapper() {
             if (fnbox) {
-                rust!(FnBoxWrapper_destructor [fnbox : *mut dyn FnMut() as "TraitObject"] {
+                rust!(FnBoxWrapper_destructor [fnbox: *mut dyn FnMut() as "TraitObject"] {
                     unsafe { let _ = Box::from_raw(fnbox); }
                 });
             }
         }
+
+        /// Copying is not allowed.
         FnBoxWrapper &operator=(const FnBoxWrapper&) = delete;
 #if false && QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
         FnBoxWrapper(const FnBoxWrapper&) = delete;
 #else
         // Prior to Qt 5.10 we can't have move-only wrapper. Just do the auto_ptr kind of hack.
-        FnBoxWrapper(const FnBoxWrapper &o) : fnbox(o.fnbox) {  const_cast<FnBoxWrapper &>(o).fnbox = {}; }
+        FnBoxWrapper(const FnBoxWrapper &o) : fnbox(o.fnbox) {
+            const_cast<FnBoxWrapper &>(o).fnbox = {};
+        }
 #endif
-        FnBoxWrapper(FnBoxWrapper &&o) : fnbox(o.fnbox) {  o.fnbox = {}; }
-        FnBoxWrapper &operator=(FnBoxWrapper &&o) { std::swap(o.fnbox, fnbox); return *this; }
+
+        /// Moving is allowed, since `Box<FnMut()>` itself is not pinned.
+        FnBoxWrapper(FnBoxWrapper &&o) : fnbox(o.fnbox) {
+            o.fnbox = {};
+        }
+        FnBoxWrapper &operator=(FnBoxWrapper &&o) {
+            std::swap(o.fnbox, fnbox);
+            return *this;
+        }
+
+        /// Call boxed function in rust.
         void operator()() {
             rust!(FnBoxWrapper_operator [fnbox : *mut dyn FnMut() as "TraitObject"] {
                 unsafe { (*fnbox)(); }
@@ -753,14 +840,14 @@ pub fn single_shot<F>(interval: std::time::Duration, func: F)
 where
     F: FnMut() + 'static,
 {
-    let func: Box<dyn FnMut()> = Box::new(func);
-    let mut func_raw = Box::into_raw(func);
+    let func_box: Box<dyn FnMut()> = Box::new(func);
+    let mut func_raw = Box::into_raw(func_box);
+
     let interval_ms: u32 = interval.as_secs() as u32 * 1000 + interval.subsec_nanos() * 1e-6 as u32;
-    unsafe {
-        cpp!([interval_ms as "int", mut func_raw as "FnBoxWrapper"] {
-            QTimer::singleShot(interval_ms, std::move(func_raw));
-        })
-    };
+
+    cpp!(unsafe [interval_ms as "int", mut func_raw as "FnBoxWrapper"] {
+        QTimer::singleShot(interval_ms, std::move(func_raw));
+    });
 }
 
 /// Create a callback to invoke a queued callback in the current thread.
@@ -772,8 +859,8 @@ where
 /// callback will not be recieved.
 ///
 /// ```
-/// # extern crate qmetaobject; use qmetaobject::queued_callback;
-/// // in this example, we do not pass '()' as an argument.
+/// # extern crate qmetaobject;
+/// # use qmetaobject::queued_callback;
 /// let callback = queued_callback(|()| println!("hello from main thread"));
 /// std::thread::spawn(move || {callback(());}).join();
 /// ```
@@ -791,7 +878,7 @@ pub fn queued_callback<T: Send, F: FnMut(T) + 'static>(
     unsafe impl<T> Send for UnsafeSendFn<T> {}
     unsafe impl<T> Sync for UnsafeSendFn<T> {}
     // put func in an arc because we need to keep it alive as long as the internal Box<FnMut> is
-    // alive. (And we can't just move it there because the returned closure can be called serveral
+    // alive. (And we can't just move it there because the returned closure can be called several
     // times.
     let func = std::sync::Arc::new(UnsafeSendFn(RefCell::new(func)));
 
@@ -806,113 +893,174 @@ pub fn queued_callback<T: Send, F: FnMut(T) + 'static>(
                 f(x);
             };
         });
+        // C++ destructor `~FnBoxWrapper` takes care of the memory.
         let mut func_raw = Box::into_raw(func);
-        unsafe {
-            cpp!([mut func_raw as "FnBoxWrapper", current_thread as "QPointer<QThread>"] {
-                if (!current_thread) return;
-                if (!qApp || current_thread != qApp->thread()) {
-                    QObject *reciever = new QObject();
-                    reciever->moveToThread(current_thread);
-                    invokeMethod(reciever, std::move(func_raw));
-                    reciever->deleteLater();
-                } else {
-                    invokeMethod(qApp, std::move(func_raw));
-                }
-            })
-        };
+        cpp!(unsafe [mut func_raw as "FnBoxWrapper", current_thread as "QPointer<QThread>"] {
+            if (!current_thread) {
+                return;
+            }
+            if (!qApp || current_thread != qApp->thread()) {
+                QObject *reciever = new QObject();
+                reciever->moveToThread(current_thread);
+                invokeMethod(reciever, std::move(func_raw));
+                reciever->deleteLater();
+            } else {
+                invokeMethod(qApp, std::move(func_raw));
+            }
+        });
     }
 }
 
 /* Small helper function for Rust_QAbstractItemModel::roleNames */
 fn add_to_hash(hash: *mut c_void, key: i32, value: QByteArray) {
-    unsafe {
-        cpp!([hash as "QHash<int, QByteArray>*", key as "int", value as "QByteArray"]{
-            (*hash)[key] = std::move(value);
-        })
-    }
+    cpp!(unsafe [
+        hash as "QHash<int, QByteArray> *",
+        key as "int",
+        value as "QByteArray"
+    ] {
+        (*hash)[key] = std::move(value);
+    });
 }
 
 /// Refer to the documentation of Qt::UserRole
 pub const USER_ROLE: i32 = 0x0100;
 
-cpp_class!(
-/// Wrapper for Qt's QMessageLogContext
-pub unsafe struct QMessageLogContext as "QMessageLogContext");
-impl QMessageLogContext {
-    // Return QMessageLogContext::line
-    pub fn line(&self) -> i32 {
-        cpp!(unsafe [self as "QMessageLogContext*"] -> i32 as "int" { return self->line; })
-    }
-    // Return QMessageLogContext::file
-    pub fn file(&self) -> &str {
-        unsafe {
-            let x = cpp!([self as "QMessageLogContext*"] -> *const c_char as "const char*" {
-                return self->file;
-            });
-            if x.is_null() {
-                return "";
-            }
-            std::ffi::CStr::from_ptr(x).to_str().unwrap()
-        }
-    }
-    // Return QMessageLogContext::function
-    pub fn function(&self) -> &str {
-        unsafe {
-            let x = cpp!([self as "QMessageLogContext*"] -> *const c_char as "const char*" {
-                return self->function;
-            });
-            if x.is_null() {
-                return "";
-            }
-            std::ffi::CStr::from_ptr(x).to_str().unwrap()
-        }
-    }
-    // Return QMessageLogContext::category
-    pub fn category(&self) -> &str {
-        unsafe {
-            let x = cpp!([self as "QMessageLogContext*"] -> *const c_char as "const char*" {
-                return self->category;
-            });
-            if x.is_null() {
-                return "";
-            }
-            std::ffi::CStr::from_ptr(x).to_str().unwrap()
-        }
-    }
-}
-
-/// Wrap Qt's QtMsgType enum
-#[repr(C)]
-#[derive(Debug)]
-pub enum QtMsgType {
-    QtDebugMsg,
-    QtWarningMsg,
-    QtCriticalMsg,
-    QtFatalMsg,
-    QtInfoMsg,
-}
-
-/// Wrap qt's qInstallMessageHandler.
-/// Useful in order to forward the log to a rust logging framework
-pub fn install_message_handler(logger: extern "C" fn(QtMsgType, &QMessageLogContext, &QString)) {
-    cpp!(unsafe [logger as "QtMessageHandler"] { qInstallMessageHandler(logger); })
-}
-
-pub mod itemmodel;
-pub use itemmodel::*;
-pub mod listmodel;
-pub use listmodel::*;
-pub mod qtdeclarative;
-pub use qtdeclarative::*;
-pub mod qmetatype;
-pub use qmetatype::*;
-#[macro_use]
-pub mod qrc;
-pub mod connections;
-pub use connections::RustSignal;
-pub use connections::{connect, CppSignal, SignalCppRepresentation};
-pub mod qtquickcontrols2;
-pub mod scenegraph;
-pub use qtquickcontrols2::*;
-pub mod future;
-pub use future::*;
+/// Embed files and made them available to the Qt resource system.
+///
+/// The macro accepts an identifier with optional preceding visibility modifier,
+/// and a comma-separated list of resources. Then macro generates a function
+/// with given name and visibility, which can be used to register all the
+/// resources.
+///
+/// # Input
+///
+/// The macro accepts the following formal grammar in pseudo [rust macro syntax][macro-doc]:
+/// ```txt
+/// macro call ::= qrc!( $f:Function $( $r:Recource ),* )
+/// Function   ::= $v:vis $name:ident
+/// Resource   ::= $( $base_dir:physical as )? $prefix:virtual { $( $f:File ),* }
+/// File       ::= $path:physical $( as $alias:virtual )?
+///
+/// physical   ::= $path:literal
+/// virtual    ::= $path:literal
+/// ```
+///
+/// _Function_ is the name for the generated function, optionally preceded by
+/// the visibility modifier (`pub(crate)` etc.)
+///
+/// _Physical_ path literal represents path on a local file system;
+/// _virtual_ path represents virtual path in the generated qrc
+/// resource tree accessible at `qrc:///virtual/path` URI.
+///
+/// **Note** that for _Resource_ physical part is optional,
+/// meanwhile _File_ has optional _Virtual_ part.
+///
+/// _Resources_ and _Files_ are comma-separated lists.
+///
+/// _Resources_ consist of a
+///  - `$base_dir:physical`: optional path to base directory on local file
+///    system, separated from the prefix by the `as` keyword.
+///    By default, base directory is the cargo project's root - directory with
+///    Cargo.toml, a.k.a. [`$CARGO_MANIFEST_DIR`][].
+///    (Custom extention which does not interfere with qrc format,
+///    but merely resolves physical path of files in this resource relative
+///    to the base directory, and helps keeping both project's root directory
+///    and resource definitions clean and short.)
+///  - `$prefix:virtual`: prefix directory path in qrc's virtual file system.
+///    It will be prepended to every file's virtual path.
+///    (Corresponds to qrc format.)
+///  - A curly-braced list of comma-separated _Files_.
+///
+/// _Files_ are specified as
+///  - `$path:physical`: path to the file on local file system.
+///    Relative to the resource's base directory.
+///    (Corresponds to qrc format, with the exception below.)
+///  - `$alias:virtual`: an optional alias in qrc's virtual file system,
+///    separated from the physical path by the `as` keyword.
+///    By default, virtual path of a file is the same as its phisycal path.
+///    (Corresponds to qrc format).
+///  - **Note** about physical path: _resource_'s base directory is prepended to
+///    the file's physical path before looking for the file on the local file
+///    system, but after the physical path is cloned to the virtual counterpart
+///    (if the later one was omitted, i.e. no explicit alias was given).
+///
+/// It does not matter if the prefix has leading '/' or not.
+///
+/// # Output
+///
+/// The macro creates a function with given name and visibility modifier,
+/// that needs to be run in order to register the resource. Function is
+/// idempotent, i.e. calling it more than once is allowed but has no effect.
+///
+/// # Example
+///
+/// Consider this project files structure:
+/// ```text
+/// .
+/// ├── Cargo.toml
+/// ├── tests/qml
+/// │   ├── qml.qrc
+/// │   ├── main.qml
+/// │   └── Bar.qml
+/// └── src
+///     └── main.rs
+/// ```
+/// then the following Rust code:
+/// ```
+/// # extern crate qmetaobject;
+/// # use qmetaobject::qrc;
+/// # // For maintainers: this is actually tested against real files.
+/// // private fn, and base directory shortcut
+/// qrc!(my_resource_1,
+///     "tests/qml" as "foo1" {
+///         "main.qml",
+///         "Bar.qml" as "baz/Foo.qml",
+///      }
+/// );
+///
+/// # // this is a test of visibility modifier
+/// # mod private {
+/// # use super::*;
+/// // public fn, no shortcuts
+/// qrc!(pub my_resource_2,
+///     "foo2" {
+///         // either use file alias or re-organize files
+///         "tests/qml/main.qml" as "main.qml",
+///         "tests/qml/Bar.qml" as "baz/Foo.qml",
+///      }
+/// );
+/// # }
+///
+/// # fn use_resource(_r: &str) {
+/// #     // at the time of writing, it is the only way to test the existence of a resource.
+/// #     use qmetaobject::*;
+/// #     let mut engine = QmlEngine::new();
+/// #     let mut c = QmlComponent::new(&engine);
+/// #     c.load_url(QUrl::from(QString::from("qrc:/foo2/baz/Foo.qml")), CompilationMode::PreferSynchronous);
+/// #     assert_eq!(ComponentStatus::Ready, c.status());
+/// #     engine.quit();
+/// # }
+/// # fn main() {
+/// // registers the resource to Qt
+/// my_resource_1();
+/// # private::
+/// my_resource_2();
+/// // do something with resources
+/// use_resource("qrc:/foo1/baz/Foo.qml");
+/// use_resource("qrc:/foo2/baz/Foo.qml");
+/// # }
+/// ```
+/// corresponds to the .qrc (`tests/qml/qml.qrc`) file:
+/// ```xml
+/// <RCC>
+///     <qresource prefix="/foo">
+///         <file>main.qml</file>
+///         <file alias="baz/Foo.qml">Bar.qml</file>
+///     </qresource>
+/// </RCC>
+/// ```
+///
+/// [macro-doc]: https://doc.rust-lang.org/reference/macros-by-example.html#metavariables
+/// [`$CARGO_MANIFEST_DIR`]: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
+pub use qmetaobject_impl::qrc_internal as qrc;
+// XXX: The line above re-exports the macro with proper documentation and doctests.

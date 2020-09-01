@@ -15,6 +15,7 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FO
 OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+//! Various bindings and wrappers for Qt classes, enums, member/static methods and functions.
 extern crate std;
 use std::convert::{TryFrom, From};
 use std::fmt::Display;
@@ -31,7 +32,9 @@ use chrono::prelude::*;
 use crate::QObject;
 
 cpp_class!(
-    /// Wrapper around Qt's QByteArray
+    /// Wrapper around [`QByteArray`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qbytearray.html
     #[derive(PartialEq, PartialOrd, Eq, Ord)]
     pub unsafe struct QByteArray as "QByteArray"
 );
@@ -51,101 +54,101 @@ impl QByteArray {
     }
 }
 impl<'a> From<&'a [u8]> for QByteArray {
-    /// Constructs a QByteArray from a slice. (Copy the slice.)
+    /// Constructs a `QByteArray` from a slice. (Copy the slice.)
     fn from(s: &'a [u8]) -> QByteArray {
         let len = s.len();
         let ptr = s.as_ptr();
-        unsafe {
-            cpp!([len as "size_t", ptr as "char*"] -> QByteArray as "QByteArray"
-        { return QByteArray(ptr, len); })
-        }
+        cpp!(unsafe [len as "size_t", ptr as "char*"] -> QByteArray as "QByteArray" {
+            return QByteArray(ptr, len);
+        })
     }
 }
 impl<'a> From<&'a str> for QByteArray {
-    /// Constructs a QByteArray from a &str. (Copy the string.)
+    /// Constructs a `QByteArray` from a `&str`. (Copy the string.)
     fn from(s: &'a str) -> QByteArray {
         s.as_bytes().into()
     }
 }
-
 impl From<String> for QByteArray {
-    /// Constructs a QByteArray from a String. (Copy the string.)
+    /// Constructs a `QByteArray` from a `String`. (Copy the string.)
     fn from(s: String) -> QByteArray {
         QByteArray::from(&*s)
     }
 }
 impl From<QString> for QByteArray {
-    /// Converts a QString to a QByteArray
+    /// Converts a `QString` to a `QByteArray`
     fn from(s: QString) -> QByteArray {
-        unsafe {
-            cpp!([s as "QString"] -> QByteArray as "QByteArray"
-            { return std::move(s).toUtf8(); })
-        }
+        cpp!(unsafe [s as "QString"] -> QByteArray as "QByteArray" {
+            return std::move(s).toUtf8();
+        })
     }
 }
 impl Display for QByteArray {
-    /// Prints the contents of the QByteArray if it contains UTF-8,  nothing otherwise
+    /// Prints the contents of the `QByteArray` if it contains UTF-8, do nothing otherwise.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         unsafe {
             let c_ptr = cpp!([self as "const QByteArray*"] -> *const c_char as "const char*" {
                 return self->constData();
             });
-            f.write_str(
-                std::ffi::CStr::from_ptr(c_ptr)
-                    .to_str()
-                    .map_err(|_| Default::default())?,
-            )
+            f.write_str(std::ffi::CStr::from_ptr(c_ptr).to_str().map_err(|_| Default::default())?)
         }
     }
 }
 impl std::fmt::Debug for QByteArray {
-    /// Prints the contents of the QByteArray if it contains UTF-8,  nothing otherwise
+    /// Prints the contents of the `QByteArray` if it contains UTF-8,  nothing otherwise
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
 cpp_class!(
-    /// Wrapper around Qt's QDate class
+    /// Wrapper around [`QDate`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qdate.html
     #[derive(PartialEq, PartialOrd, Eq, Ord)]
     pub unsafe struct QDate as "QDate"
 );
-
 impl QDate {
-    /// Constructs a QDate from the year, month and date.
-    /// Refer to the Qt documentation for the QDate constructor.
+    /// Wrapper around [`QDate(int y, int m, int d)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qdate.html#QDate-2
     pub fn from_y_m_d(y: i32, m: i32, d: i32) -> Self {
         cpp!(unsafe [y as "int", m as "int", d as "int"] -> QDate as "QDate" {
             return QDate(y, m, d);
         })
     }
 
-    /// Returns the year, month and day components.
-    /// Refer to the Qt documentation for QDate::getDate.
+    /// Wrapper around [`QDate::getDate(int *year, int *month, int *day)`][method] method.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Returns the year, month and day components as a tuple, instead of mutable references.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qdate.html#getDate
     pub fn get_y_m_d(&self) -> (i32, i32, i32) {
-        let res = (0, 0, 0);
-        let (ref y, ref m, ref d) = res;
+        let mut res = (0, 0, 0);
+        let (ref mut y, ref mut m, ref mut d) = res;
         cpp!(unsafe [self as "const QDate*", y as "int*", m as "int*", d as "int*"] {
             return self->getDate(y, m, d);
         });
         res
     }
 
-    /// Refer to the Qt documentation for QDate::isValid.
+    /// Wrapper around [`QDate::isValid()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qdate.html#isValid
     pub fn is_valid(&self) -> bool {
         cpp!(unsafe [self as "const QDate*"] -> bool as "bool" {
             return self->isValid();
         })
     }
 }
-
 #[cfg(feature = "chrono_qdatetime")]
 impl From<NaiveDate> for QDate {
     fn from(a: NaiveDate) -> QDate {
         QDate::from_y_m_d(a.year() as i32, a.month() as i32, a.day() as i32)
     }
 }
-
 #[cfg(feature = "chrono_qdatetime")]
 impl Into<NaiveDate> for QDate {
     fn into(self) -> NaiveDate {
@@ -182,14 +185,20 @@ fn test_qdate_chrono() {
 }
 
 cpp_class!(
-    /// Wrapper around Qt's QTime class
+    /// Wrapper around [`QTime`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qtime.html
     #[derive(PartialEq, PartialOrd, Eq, Ord)]
     pub unsafe struct QTime as "QTime"
 );
-
 impl QTime {
-    /// Constructs a QTime from hours and minutes, and optionally seconds and milliseconds.
-    /// Refer to the Qt documentation for the QTime constructor.
+    /// Wrapper around [`QTime(int h, int m, int s = 0, int ms = 0)`][ctor] constructor.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Default arguments converted to `Option`s.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qtime.html#QTime-2
     pub fn from_h_m_s_ms(h: i32, m: i32, s: Option<i32>, ms: Option<i32>) -> Self {
         let s = s.unwrap_or(0);
         let ms = ms.unwrap_or(0);
@@ -199,28 +208,36 @@ impl QTime {
         })
     }
 
-    /// Refer to the Qt documentation for QTime::hour.
+    /// Wrapper around [`QTime::hour()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qtime.html#hour
     pub fn get_hour(&self) -> i32 {
         cpp!(unsafe [self as "const QTime*"] -> i32 as "int" {
             return self->hour();
         })
     }
 
-    /// Refer to the Qt documentation for QTime::minute.
+    /// Wrapper around [`QTime::minute()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qtime.html#minute
     pub fn get_minute(&self) -> i32 {
         cpp!(unsafe [self as "const QTime*"] -> i32 as "int" {
             return self->minute();
         })
     }
 
-    /// Refer to the Qt documentation for QTime::second.
+    /// Wrapper around [`QTime::second()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qtime.html#second
     pub fn get_second(&self) -> i32 {
         cpp!(unsafe [self as "const QTime*"] -> i32 as "int" {
             return self->second();
         })
     }
 
-    /// Refer to the Qt documentation for QTime::msec.
+    /// Wrapper around [`QTime::msec()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qtime.html#msec
     pub fn get_msec(&self) -> i32 {
         cpp!(unsafe [self as "const QTime*"] -> i32 as "int" {
             return self->msec();
@@ -229,15 +246,12 @@ impl QTime {
 
     /// Convenience function for obtaining the hour, minute, second and millisecond components.
     pub fn get_h_m_s_ms(&self) -> (i32, i32, i32, i32) {
-        (
-            self.get_hour(),
-            self.get_minute(),
-            self.get_second(),
-            self.get_msec(),
-        )
+        (self.get_hour(), self.get_minute(), self.get_second(), self.get_msec())
     }
 
-    /// Refer to the Qt documentation for QTime::isValid.
+    /// Wrapper around [`QTime::isValid()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qtime.html#isValid
     pub fn is_valid(&self) -> bool {
         cpp!(unsafe [self as "const QTime*"] -> bool as "bool" {
             return self->isValid();
@@ -293,40 +307,47 @@ fn test_qtime_is_valid() {
 }
 
 cpp_class!(
-    /// Wrapper around Qt's QDateTime class
+    /// Wrapper around [`QDateTime`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qdatetime.html
     #[derive(PartialEq, PartialOrd, Eq, Ord)]
     pub unsafe struct QDateTime as "QDateTime"
 );
-
 impl QDateTime {
-    /// Constructs a QDateTime from a QDate.
-    /// Refer to the documentation for QDateTime's constructor using QDate.
+    /// Wrapper around [`QDateTime(const QDateTime &other)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qdatetime.html#QDateTime-1
     pub fn from_date(date: QDate) -> Self {
         cpp!(unsafe [date as "QDate"] -> QDateTime as "QDateTime" {
             return QDateTime(date);
         })
     }
 
-    /// Constructs a QDateTime from a QDate and a QTime, using the current system timezone.
+    /// Wrapper around [`QDateTime(const QDate &date, const QTime &time, Qt::TimeSpec spec = Qt::LocalTime)`][ctor] constructor.
     ///
-    /// Equivalent to the C++ code `QDateTime(date, time)`.
-    /// Refer to the documentation for QDateTime's constructor using QDate, QTime and Qt::TimeSpec.
+    /// # Wrapper-specific
+    ///
+    /// `spec` is left as it is, thus it is always `Qt::LocalTime`.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qdatetime.html#QDateTime-2
     pub fn from_date_time_local_timezone(date: QDate, time: QTime) -> Self {
         cpp!(unsafe [date as "QDate", time as "QTime"] -> QDateTime as "QDateTime" {
             return QDateTime(date, time);
         })
     }
 
-    /// Gets the date component from a QDateTime.
-    /// Refer to the documentation for QDateTime::date.
+    /// Wrapper around [`QDateTime::date()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qdatetime.html#date
     pub fn get_date(&self) -> QDate {
         cpp!(unsafe [self as "const QDateTime*"] -> QDate as "QDate" {
             return self->date();
         })
     }
 
-    /// Gets the time component from a QDateTime.
-    /// Refer to the documentation for QDateTime::time.
+    /// Wrapper around [`QDateTime::time()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qdatetime.html#time
     pub fn get_time(&self) -> QTime {
         cpp!(unsafe [self as "const QDateTime*"] -> QTime as "QTime" {
             return self->time();
@@ -338,7 +359,9 @@ impl QDateTime {
         (self.get_date(), self.get_time())
     }
 
-    /// Refer to the Qt documentation for QDateTime::isValid.
+    /// Wrapper around [`QDateTime::isValid()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qdatetime.html#isValid
     pub fn is_valid(&self) -> bool {
         cpp!(unsafe [self as "const QDateTime*"] -> bool as "bool" {
             return self->isValid();
@@ -416,39 +439,39 @@ fn test_qdatetime_is_valid() {
 }
 
 cpp_class!(
-/// Wrapper around Qt's QUrl class
+    /// Wrapper around [`QUrl`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qurl.html
     #[derive(PartialEq, PartialOrd, Eq, Ord)]
     pub unsafe struct QUrl as "QUrl"
 );
-
 impl QUrl {
-    /// Returns a valid URL from a user supplied qstring if one can be deducted.
-    /// In the case that is not possible, an invalid QUrl is returned.
-    /// 
-    /// Refer to the documentation for QUrl::fromUserInput.
-    pub fn from_user_input(qstring: QString) -> QUrl {
-        unsafe {
-            cpp!([qstring as "QString"] -> QUrl as "QUrl" {
-                return QUrl::fromUserInput(qstring);
-            })
-        }
+    /// Wrapper around [`QUrl::fromUserInput(const QString &userInput)`][method] static method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qurl.html#fromUserInput
+    pub fn from_user_input(user_input: QString) -> QUrl {
+        cpp!(unsafe [user_input as "QString"] -> QUrl as "QUrl" {
+            return QUrl::fromUserInput(user_input);
+        })
     }
 }
-
 impl From<QString> for QUrl {
     fn from(qstring: QString) -> QUrl {
-        unsafe { cpp!([qstring as "QString"] -> QUrl as "QUrl" {
+        cpp!(unsafe [qstring as "QString"] -> QUrl as "QUrl" {
             return QUrl(qstring);
-        })}
+        })
     }
 }
 
 cpp_class!(
-/// Wrapper around Qt's QString class
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
-pub unsafe struct QString as "QString");
+    /// Wrapper around [`QString`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qstring.html
+    #[derive(PartialEq, PartialOrd, Eq, Ord)]
+    pub unsafe struct QString as "QString"
+);
 impl QString {
-    /// Return a slice containing the UTF-16 data
+    /// Return a slice containing the UTF-16 data.
     pub fn to_slice(&self) -> &[u16] {
         unsafe {
             let mut size: usize = 0;
@@ -461,19 +484,27 @@ impl QString {
     }
 }
 impl From<QUrl> for QString {
+    /// Wrapper around [`QUrl::toString(QUrl::FormattingOptions=...)`][method] method.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Formatting options are left at defaults.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qurl.html#toString
     fn from(qurl: QUrl) -> QString {
-        unsafe { cpp!([qurl as "QUrl"] -> QString as "QString" {
+        cpp!(unsafe [qurl as "QUrl"] -> QString as "QString" {
             return qurl.toString();
-        })}
+        })
     }
 }
 impl<'a> From<&'a str> for QString {
-    /// Copy the data from a &str
+    /// Copy the data from a `&str`.
     fn from(s: &'a str) -> QString {
         let len = s.len();
         let ptr = s.as_ptr();
-        unsafe { cpp!([len as "size_t", ptr as "char*"] -> QString as "QString"
-        { return QString::fromUtf8(ptr, len); })}
+        cpp!(unsafe [len as "size_t", ptr as "char*"] -> QString as "QString" {
+            return QString::fromUtf8(ptr, len);
+        })
     }
 }
 impl From<String> for QString {
@@ -509,18 +540,29 @@ impl fmt::Display for CannotConvertQVariant {
 impl std::error::Error for CannotConvertQVariant {}
 
 cpp_class!(
-/// Wrapper around a QVariant
-#[derive(PartialEq)] pub unsafe struct QVariant as "QVariant");
+    /// Wrapper around [`QVariant`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qvariant.html
+    #[derive(PartialEq)]
+    pub unsafe struct QVariant as "QVariant"
+);
 impl QVariant {
+    /// Wrapper around [`toByteArray()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qvariant.html#toByteArray
     pub fn to_qbytearray(&self) -> QByteArray {
-        // FIXME
-        unsafe {
-            cpp!([self as "const QVariant*"] -> QByteArray as "QByteArray" { return self->toByteArray(); })
-        }
+        cpp!(unsafe [self as "const QVariant*"] -> QByteArray as "QByteArray" {
+            return self->toByteArray();
+        })
     }
 
+    /// Wrapper around [`toBool()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qvariant.html#toBool
     pub fn to_bool(&self) -> bool {
-        unsafe { cpp!([self as "const QVariant*"] -> bool as "bool" { return self->toBool(); }) }
+        cpp!(unsafe [self as "const QVariant*"] -> bool as "bool" {
+            return self->toBool();
+        })
     }
 
     /// Create a new `QVariant` from a struct implementing `QObject`.
@@ -543,8 +585,13 @@ impl QVariant {
 
 
 impl From<QString> for QVariant {
+    /// Wrapper around [`QVariant(const QString &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-14
     fn from(a: QString) -> QVariant {
-        unsafe { cpp!([a as "QString"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QString"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QString {
@@ -570,8 +617,13 @@ impl TryFrom<QVariant> for QString {
 }
 
 impl From<QByteArray> for QVariant {
+    /// Wrapper around [`QVariant(const QByteArray &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-12
     fn from(a: QByteArray) -> QVariant {
-        unsafe { cpp!([a as "QByteArray"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QByteArray"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QByteArray {
@@ -597,8 +649,13 @@ impl TryFrom<QVariant> for QByteArray {
 }
 
 impl From<QDate> for QVariant {
+    /// Wrapper around [`QVariant(const QDate &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-18
     fn from(a: QDate) -> QVariant {
-        unsafe { cpp!([a as "QDate"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QDate"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QDate {
@@ -624,8 +681,13 @@ impl TryFrom<QVariant> for QDate {
 }
 
 impl From<QTime> for QVariant {
+    /// Wrapper around [`QVariant(const QTime &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-19
     fn from(a: QTime) -> QVariant {
-        unsafe { cpp!([a as "QTime"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QTime"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QTime {
@@ -652,8 +714,13 @@ impl TryFrom<QVariant> for QTime {
 
 
 impl From<QDateTime> for QVariant {
+    /// Wrapper around [`QVariant(const QDateTime &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-20
     fn from(a: QDateTime) -> QVariant {
-        unsafe { cpp!([a as "QDateTime"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QDateTime"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QDateTime {
@@ -679,8 +746,13 @@ impl TryFrom<QVariant> for QDateTime {
 }
 
 impl From<QUrl> for QVariant {
+    /// Wrapper around [`QVariant(const QUrl &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-35
     fn from(a: QUrl) -> QVariant {
-        unsafe { cpp!([a as "QUrl"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QUrl"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QUrl {
@@ -706,8 +778,13 @@ impl TryFrom<QVariant> for QUrl {
 }
 
 impl From<QVariantList> for QVariant {
+    /// Wrapper around [`QVariant(const QVariantList &)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-21
     fn from(a: QVariantList) -> QVariant {
-        unsafe { cpp!([a as "QVariantList"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "QVariantList"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for QVariantList {
@@ -733,8 +810,13 @@ impl TryFrom<QVariant> for QVariantList {
 }
 
 impl From<i32> for QVariant {
+    /// Wrapper around [`QVariant(int)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-4
     fn from(a: i32) -> QVariant {
-        unsafe { cpp!([a as "int"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "int"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for i32 {
@@ -760,8 +842,33 @@ impl TryFrom<QVariant> for i32 {
 }
 
 impl From<u32> for QVariant {
+    /// Wrapper around [`QVariant(uint)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-5
     fn from(a: u32) -> QVariant {
-        unsafe { cpp!([a as "uint"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "uint"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
+    }
+}
+impl From<i64> for QVariant {
+    /// Wrapper around [`QVariant(int)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-4
+    fn from(a: i64) -> QVariant {
+        cpp!(unsafe [a as "qlonglong"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
+    }
+}
+impl From<u64> for QVariant {
+    /// Wrapper around [`QVariant(uint)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-5
+    fn from(a: u64) -> QVariant {
+        cpp!(unsafe [a as "qulonglong"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for u32 {
@@ -787,8 +894,13 @@ impl TryFrom<QVariant> for u32 {
 }
 
 impl From<f32> for QVariant {
+    /// Wrapper around [`QVariant(float)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-10
     fn from(a: f32) -> QVariant {
-        unsafe { cpp!([a as "float"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "float"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for f32 {
@@ -814,8 +926,13 @@ impl TryFrom<QVariant> for f32 {
 }
 
 impl From<f64> for QVariant {
+    /// Wrapper around [`QVariant(double)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-9
     fn from(a: f64) -> QVariant {
-        unsafe { cpp!([a as "double"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "double"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for f64 {
@@ -841,8 +958,13 @@ impl TryFrom<QVariant> for f64 {
 }
 
 impl From<bool> for QVariant {
+    /// Wrapper around [`QVariant(bool)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qvariant.html#QVariant-8
     fn from(a: bool) -> QVariant {
-        unsafe { cpp!([a as "bool"] -> QVariant as "QVariant" { return QVariant(a); }) }
+        cpp!(unsafe [a as "bool"] -> QVariant as "QVariant" {
+            return QVariant(a);
+        })
     }
 }
 impl TryFrom<QVariant> for bool {
@@ -877,31 +999,55 @@ where
 }
 
 cpp_class!(
-/// Wrapper around QVariantList
-pub unsafe struct QVariantList as "QVariantList");
+    /// Wrapper around [`QVariantList`][type] typedef.
+    ///
+    /// [type]: https://doc.qt.io/qt-5/qvariant.html#QVariantList-typedef
+    pub unsafe struct QVariantList as "QVariantList"
+);
 impl QVariantList {
+    /// Wrapper around [`append(const T &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#append
     pub fn push(&mut self, value: QVariant) {
-        cpp!(unsafe [self as "QVariantList*", value as "QVariant"]
-            { self->append(std::move(value)); }
-        )
+        cpp!(unsafe [self as "QVariantList*", value as "QVariant"] {
+            self->append(std::move(value));
+        })
     }
+
+    /// Wrapper around [`insert(int, const QVariant &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#insert
     pub fn insert(&mut self, index: usize, element: QVariant) {
-        cpp!(unsafe [self as "QVariantList*", index as "size_t", element as "QVariant"]
-            { self->insert(index, std::move(element)); }
-        )
+        cpp!(unsafe [self as "QVariantList*", index as "size_t", element as "QVariant"] {
+            self->insert(index, std::move(element));
+        })
     }
+
+    /// Wrapper around [`takeAt(int)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#takeAt
     pub fn remove(&mut self, index: usize) -> QVariant {
-        cpp!(unsafe [self as "QVariantList*", index as "size_t"] -> QVariant as "QVariant"
-            { return self->takeAt(index); }
-        )
+        cpp!(unsafe [self as "QVariantList*", index as "size_t"] -> QVariant as "QVariant" {
+            return self->takeAt(index);
+        })
     }
+
+    /// Wrapper around [`size()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#size
     pub fn len(&self) -> usize {
-        unsafe {cpp!([self as "QVariantList*"] -> usize as "size_t"
-            { return self->size(); }
-        )}
+        cpp!(unsafe [self as "QVariantList*"] -> usize as "size_t" {
+            return self->size();
+        })
     }
+
+    /// Wrapper around [`isEmpty()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#isEmpty
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        cpp!(unsafe [self as "QVariantList*"] -> bool as "bool" {
+            return self->isEmpty();
+        })
     }
     pub fn iter<'a>(&'a self) -> QVariantListIterator<'a> {
         QVariantListIterator {
@@ -919,26 +1065,38 @@ impl QVariantList {
         }        
     }    
 }
-
 impl Index<usize> for QVariantList {
     type Output = QVariant;
+
+    /// Wrapper around [`at(int)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#at
     fn index(&self, index: usize) -> &QVariant {
         assert!(index < self.len());
-        unsafe { &*cpp!([self as "QVariantList*", index as "size_t"] -> *const QVariant as "const QVariant*"
-            { return &self->at(index); }
-        )}
+        unsafe {
+            &*cpp!([self as "QVariantList*", index as "size_t"] -> *const QVariant as "const QVariant*" {
+                return &self->at(index);
+            })
+        }
     }
 }
 impl IndexMut<usize> for QVariantList {
+    /// Wrapper around [`operator[](int)`][method] operator method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qlist.html#operator-5b-5d
     fn index_mut(&mut self, index: usize) -> &mut QVariant {
         assert!(index < self.len());
-        unsafe { &mut *cpp!([self as "QVariantList*", index as "size_t"] -> *mut QVariant as "QVariant*"
-            { return &(*self)[index]; }
-        )}
+        unsafe {
+            &mut *cpp!([self as "QVariantList*", index as "size_t"] -> *mut QVariant as "QVariant*" {
+                return &(*self)[index];
+            })
+        }
     }
 }
 
-/// Iternal class used to iterate over a QVariantList
+/// Internal class used to iterate over a [`QVariantList`][]
+///
+/// [`QVariantList`]: ./struct.QVariantList.html
 pub struct QVariantListIterator<'a> {
     list: &'a QVariantList,
     index: usize,
@@ -982,11 +1140,7 @@ impl<'a> IntoIterator for &'a QVariantList {
     type IntoIter = QVariantListIterator<'a>;
 
     fn into_iter(self) -> QVariantListIterator<'a> {
-        QVariantListIterator::<'a> {
-            list: self,
-            index: 0,
-            size: self.len(),
-        }
+        QVariantListIterator::<'a> { list: self, index: 0, size: self.len() }
     }
 }
 
@@ -1030,7 +1184,7 @@ mod tests {
     }
 
     #[test]
-    fn test_qstring_and_qbytearrazy() {
+    fn test_qstring_and_qbytearray() {
         let qba1: QByteArray = (b"hello" as &[u8]).into();
         let qba2: QByteArray = "hello".into();
         let s: String = "hello".into();
@@ -1061,7 +1215,7 @@ mod tests {
         let qstring = QString::from_qvariant(v.clone()).unwrap();
         let mut s = qstring.to_string();
         if s.ends_with(".100") {
-            // Old version of qt did not include the miliseconds, so remove it
+            // Old version of qt did not include the milliseconds, so remove it
             s.truncate(s.len() - 4);
         }
         assert_eq!(s, "2019-10-23T10:30:40");
@@ -1094,30 +1248,56 @@ mod tests {
 }
 
 cpp_class!(
-/// Wrapper around Qt's QModelIndex
-#[derive(PartialEq, Eq)] pub unsafe struct QModelIndex as "QModelIndex");
+    /// Wrapper around [`QModelIndex`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qmodelindex.html
+    #[derive(PartialEq, Eq)]
+    pub unsafe struct QModelIndex as "QModelIndex"
+);
 impl QModelIndex {
-    /// Return the QModelIndex::internalId
+    /// Wrapper around [`internalId()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qmodelindex.html#internalId
     pub fn id(&self) -> usize {
-        unsafe {
-            cpp!([self as "const QModelIndex*"] -> usize as "uintptr_t" { return self->internalId(); })
-        }
+        cpp!(unsafe [self as "const QModelIndex*"] -> usize as "uintptr_t" { return self->internalId(); })
     }
+
+    /// Wrapper around [`column()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qmodelindex.html#column
     pub fn column(&self) -> i32 {
-        unsafe { cpp!([self as "const QModelIndex*"] -> i32 as "int" { return self->column(); }) }
+        cpp!(unsafe [self as "const QModelIndex*"] -> i32 as "int" { return self->column(); })
     }
+
+    /// Wrapper around [`row()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qmodelindex.html#row
     pub fn row(&self) -> i32 {
-        unsafe { cpp!([self as "const QModelIndex*"] -> i32 as "int" { return self->row(); }) }
+        cpp!(unsafe [self as "const QModelIndex*"] -> i32 as "int" { return self->row(); })
     }
+
+    /// Wrapper around [`isValid()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qmodelindex.html#isValid
     pub fn is_valid(&self) -> bool {
-        unsafe { cpp!([self as "const QModelIndex*"] -> bool as "bool" { return self->isValid(); }) }
+        cpp!(unsafe [self as "const QModelIndex*"] -> bool as "bool" { return self->isValid(); })
     }
 }
 
+/// Bindings for [`qreal`][type] typedef.
+///
+/// [type]: https://doc.qt.io/qt-5/qtglobal.html#qreal-typedef
 #[allow(non_camel_case_types)]
-type qreal = f64;
+#[cfg(qreal_is_float)]
+pub type qreal = f32;
 
-/// Wrapper around QRectF
+#[allow(non_camel_case_types)]
+#[cfg(not(qreal_is_float))]
+pub type qreal = f64;
+
+/// Bindings for [`QRectF`][class] class.
+///
+/// [class]: https://doc.qt.io/qt-5/qrectf.html
 #[repr(C)]
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct QRectF {
@@ -1126,22 +1306,25 @@ pub struct QRectF {
     pub width: qreal,
     pub height: qreal,
 }
-
 impl QRectF {
+    /// Wrapper around [`contains(const QPointF &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qrectf.html#contains
     pub fn contains(&self, pos: QPointF) -> bool {
         cpp!(unsafe [self as "const QRectF*", pos as "QPointF"] -> bool as "bool" {
             return self->contains(pos);
         })
     }
+
+    // XXX: shouldn't it be a wrapper for cpp call?
     pub fn top_left(&self) -> QPointF {
-        QPointF {
-            x: self.x,
-            y: self.y,
-        }
+        QPointF { x: self.x, y: self.y }
     }
 }
 
-/// Wrapper around QPointF
+/// Bindings for [`QPointF`][class] class.
+///
+/// [class]: https://doc.qt.io/qt-5/qpointf.html
 #[repr(C)]
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct QPointF {
@@ -1150,40 +1333,41 @@ pub struct QPointF {
 }
 impl std::ops::Add for QPointF {
     type Output = QPointF;
+    /// Wrapper around [`operator+(const QPointF &, const QPointF &)`][func] function.
+    ///
+    /// [func]: https://doc.qt.io/qt-5/qpointf.html#operator-2b
     fn add(self, other: QPointF) -> QPointF {
-        QPointF {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
+        QPointF { x: self.x + other.x, y: self.y + other.y }
     }
 }
 impl std::ops::AddAssign for QPointF {
+    /// Wrapper around [`operator+=(const QPointF &`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qpointf.html#operator-2b-eq
     fn add_assign(&mut self, other: QPointF) {
-        *self = QPointF {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        };
+        *self = QPointF { x: self.x + other.x, y: self.y + other.y };
     }
 }
 
 #[test]
 fn test_qpointf_qrectf() {
-    let rect = QRectF {
-        x: 200.,
-        y: 150.,
-        width: 60.,
-        height: 75.,
-    };
+    let rect = QRectF { x: 200., y: 150., width: 60., height: 75. };
     let pt = QPointF { x: 12., y: 5.5 };
     assert!(!rect.contains(pt));
     assert!(rect.contains(pt + rect.top_left()));
 }
 
 cpp_class!(
-/// Wrapper around QColor
-#[derive(Default, Clone, Copy, PartialEq)] pub unsafe struct QColor as "QColor");
+    /// Wrapper around [`QColor`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qcolor.html
+    #[derive(Default, Clone, Copy, PartialEq)]
+    pub unsafe struct QColor as "QColor"
+);
 impl QColor {
-    /// Construct a QColor from a string. Refer to the Qt documentation of QColor::setNamedColor
+    /// Wrapper around [`QColor(QLatin1String)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qcolor.html#QColor-8
     pub fn from_name(name: &str) -> Self {
         let len = name.len();
         let ptr = name.as_ptr();
@@ -1191,21 +1375,41 @@ impl QColor {
             return QColor(QLatin1String(ptr, len));
         })
     }
-    /// Refer to the Qt documentation of QColor::fromRgbF
+
+    /// Wrapper around [`fromRgbF(qreal r, qreal g, qreal b, qreal a = 1.0)`][ctor] constructor.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Alpha is left at default `1.0`. To set it to something other that 1.0, use [`from_rgba_f`][].
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qcolor.html#fromRgbF
+    /// [`from_rgba_f`]: #method.from_rgba_f
     pub fn from_rgb_f(r: qreal, g: qreal, b: qreal) -> Self {
         cpp!(unsafe [r as "qreal", g as "qreal", b as "qreal"] -> QColor as "QColor" {
             return QColor::fromRgbF(r, g, b);
         })
     }
-    /// Same as from_rgb_f, but accept an alpha value.
+
+    /// Wrapper around [`fromRgbF(qreal r, qreal g, qreal b, qreal a = 1.0)`][ctor] constructor.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Same as [`from_rgb_f`][], but accept an alpha value
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qcolor.html#fromRgbF
+    /// [`from_rgb_f`]: #method.from_rgb_f
     pub fn from_rgba_f(r: qreal, g: qreal, b: qreal, a: qreal) -> Self {
         cpp!(unsafe [r as "qreal", g as "qreal", b as "qreal", a as "qreal"] -> QColor as "QColor" {
             return QColor::fromRgbF(r, g, b, a);
         })
     }
-
-    /// Returns the individual component as floating point.
-    /// Refer to the Qt documentation of QColor::getRgbF.
+    /// Wrapper around [`getRgbF(qreal *r, qreal *g, qreal *b, qreal *a = nullptr)`][method] method.
+    ///
+    /// # Wrapper-specific
+    ///
+    /// Returns red, green, blue and alpha components as a tuple, instead of mutable references.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qcolor.html#getRgbF
     pub fn get_rgba(&self) -> (qreal, qreal, qreal, qreal) {
         let res = (0., 0., 0., 0.);
         let (ref r, ref g, ref b, ref a) = res;
@@ -1232,7 +1436,9 @@ fn test_qcolor() {
     assert!(blue1 != red1);
 }
 
-/// Wrapper around QSize
+/// Bindings for [`QSize`][class] class.
+///
+/// [class]: https://doc.qt.io/qt-5/qsize.html
 #[repr(C)]
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct QSize {
@@ -1240,65 +1446,105 @@ pub struct QSize {
     pub height: u32,
 }
 
+/// Bindings for [`QImage::Format`][class] enum class.
+///
+/// [class]: https://doc.qt.io/qt-5/qimage.html#Format-enum
 #[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)]
 pub enum ImageFormat {
-    Invalid,
-    Mono,
-    MonoLSB,
-    Indexed8,
-    RGB32,
-    ARGB32,
-    ARGB32_Premultiplied,
-    RGB16,
-    ARGB8565_Premultiplied,
-    RGB666,
-    ARGB6666_Premultiplied,
-    RGB555,
-    ARGB8555_Premultiplied,
-    RGB888,
-    RGB444,
-    ARGB4444_Premultiplied,
-    RGBX8888,
-    RGBA8888,
-    RGBA8888_Premultiplied,
-    BGR30,
-    A2BGR30_Premultiplied,
-    RGB30,
-    A2RGB30_Premultiplied,
-    Alpha8,
-    Grayscale8,
+    Invalid = 0,
+    Mono = 1,
+    MonoLSB = 2,
+    Indexed8 = 3,
+    RGB32 = 4,
+    ARGB32 = 5,
+    ARGB32_Premultiplied = 6,
+    RGB16 = 7,
+    ARGB8565_Premultiplied = 8,
+    RGB666 = 9,
+    ARGB6666_Premultiplied = 10,
+    RGB555 = 11,
+    ARGB8555_Premultiplied = 12,
+    RGB888 = 13,
+    RGB444 = 14,
+    ARGB4444_Premultiplied = 15,
+    RGBX8888 = 16,
+    RGBA8888 = 17,
+    RGBA8888_Premultiplied = 18,
+    BGR30 = 19,
+    A2BGR30_Premultiplied = 20,
+    RGB30 = 21,
+    A2RGB30_Premultiplied = 22,
+    Alpha8 = 23,
+    Grayscale8 = 24,
+    Grayscale16 = 28,
+    RGBX64 = 25,
+    RGBA64 = 26,
+    RGBA64_Premultiplied = 27,
+    BGR888 = 29,
 }
 cpp_class!(
-/// Wrapper around QImage
-pub unsafe struct QImage as "QImage");
+    /// Wrapper around [`QImage`][class] class.
+    ///
+    /// [class]: https://doc.qt.io/qt-5/qimage.html
+    pub unsafe struct QImage as "QImage"
+);
 impl QImage {
+    /// Wrapper around [`QImage(const QString &fileName, const char *format = nullptr)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qimage.html#QImage-8
     pub fn load_from_file(filename: QString) -> Self {
         cpp!(unsafe [filename as "QString"] -> QImage as "QImage" {
             return QImage(filename);
         })
     }
+
+    /// Wrapper around [`QImage(const QSize &, QImage::Format)`][ctor] constructor.
+    ///
+    /// [ctor]: https://doc.qt.io/qt-5/qimage.html#QImage-1
     pub fn new(size: QSize, format: ImageFormat) -> Self {
         cpp!(unsafe [size as "QSize", format as "QImage::Format" ] -> QImage as "QImage" {
             return QImage(size, format);
         })
     }
+
+    /// Wrapper around [`size()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qimage.html#size
     pub fn size(&self) -> QSize {
         cpp!(unsafe [self as "const QImage*"] -> QSize as "QSize" { return self->size(); })
     }
+
+    /// Wrapper around [`format()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qimage.html#format
     pub fn format(&self) -> ImageFormat {
         cpp!(unsafe [self as "const QImage*"] -> ImageFormat as "QImage::Format" { return self->format(); })
     }
+
+    /// Wrapper around [`fill(const QColor &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qimage.html#fill-1
     pub fn fill(&mut self, color: QColor) {
         cpp!(unsafe [self as "QImage*", color as "QColor"] { self->fill(color); })
     }
+
+    /// Wrapper around [`setPixelColor(const QPoint &, const QColor &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qimage.html#setPixelColor
     pub fn set_pixel_color(&mut self, x: u32, y: u32, color: QColor) {
-        cpp!(unsafe [self as "QImage*", x as "int", y as "int", color as "QColor"]
-            { self->setPixelColor(x, y, color); })
+        cpp!(unsafe [self as "QImage*", x as "int", y as "int", color as "QColor"] {
+            self->setPixelColor(x, y, color);
+        })
     }
+
+    /// Wrapper around [`pixelColor(const QPoint &)`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qimage.html#pixelColor
     pub fn get_pixel_color(&mut self, x: u32, y: u32) -> QColor {
-        cpp!(unsafe [self as "QImage*", x as "int", y as "int"] -> QColor as "QColor"
-            { return self->pixelColor(x, y); })
+        cpp!(unsafe [self as "QImage*", x as "int", y as "int"] -> QColor as "QColor" {
+            return self->pixelColor(x, y);
+        })
     }
 }

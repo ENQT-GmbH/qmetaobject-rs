@@ -21,41 +21,6 @@ Q_CORE_EXPORT bool qRegisterResourceData(int, const unsigned char *,
                                          const unsigned char *, const unsigned char *);
 }}
 
-/// Macro to embed files and made them available to the Qt resource system
-///
-/// ```ignore
-/// qrc!(my_ressource,
-///     "qml" {
-///         "main.qml",
-///         "Foo.qml" as "foo/Foo.qml",
-///      }
-/// );
-///
-/// //...
-/// my_resource(); // registers the resource to Qt
-/// ```
-///
-/// corresponds to the .qrc file:
-/// ```ignore
-///    <RCC>
-///        <qresource prefix="/qml">
-///            <file>main.qml</file>
-///            <file alias="foo/Foo.qml">Foo.qml</file>
-///        </qresource>
-///    </RCC>
-/// ```
-///
-/// The paths are relative to the location in which cargo runs.
-///
-/// The macro creates a function that needs to be run in order to register the
-/// resource. Calling the function more than once has no effect.
-#[macro_export]
-macro_rules! qrc { // This is just a forwarding marco so it is documented
-    ($fn_name:ident, $($tokens:tt)* ) => {
-        qrc_internal!($fn_name, $($tokens)*);
-    }
-}
-
 /// Internal function used from qrc procedural macro.
 /// Unsafe because it can crash if the data structure are not proper.
 #[doc(ignore)]
