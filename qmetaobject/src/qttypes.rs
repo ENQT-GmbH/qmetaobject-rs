@@ -527,7 +527,7 @@ impl QVariant {
     ///
     /// # Panics
     /// Panics when the C++ object has already been constructed.
-    pub fn from_new_qobject<O>(obj: O) -> Self 
+    pub fn from_qobject<O>(obj: O) -> Self 
     where O: QObject + 'static 
     {
         unsafe {
