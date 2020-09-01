@@ -175,7 +175,7 @@ pub use lazy_static::*;
 macro_rules! qmetaobject_lazy_static { ($($t:tt)*) => { lazy_static!($($t)*) } }
 
 use std::cell::RefCell;
-use std::os::raw::{c_char, c_void};
+use std::{sync::Arc, os::raw::{c_char, c_void}};
 
 pub use itemmodel::*;
 pub use listmodel::*;
@@ -908,6 +908,58 @@ pub fn queued_callback<T: Send, F: FnMut(T) + 'static>(
                 invokeMethod(qApp, std::move(func_raw));
             }
         });
+    }
+}
+
+
+/// Calls a closure on the Qt event loop with a reference to a `QObject`.
+pub struct Callback<T: QObject + 'static> {
+    callback: Arc<Box<dyn Fn(Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>) + Send + Sync>>,
+}
+
+impl<T: QObject + 'static> Clone for Callback<T> {
+    fn clone(&self) -> Self {
+        Self { callback: self.callback.clone() }
+    }
+}
+
+impl<T: QObject + 'static> Callback<T> {
+    /// Create with specified target QObject.
+    ///
+    /// Target QObject must have its C++ object created.
+    pub fn new(target: &T) -> Self {
+        let target_ptr = QPointer::from(&*target);
+        assert!(!target_ptr.is_null(), "Cannot create QtCallback for QObject with null C++ object");
+        let callback = Box::new(queued_callback(move |f: Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>| {
+            target_ptr.as_pinned().map(|target_pinned| {
+                f(target_pinned);
+            });
+        }));
+        Self { callback: Arc::new(callback) }
+    }
+
+    /// Call closure with a `QObjectPinned<T>` argument.
+    pub fn call<F: FnOnce(QObjectPinned<T>) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(f);
+        (*self.callback)(fb);
+    }
+
+    /// Call closure with a `&T` argument.
+    pub fn call_ref<F: FnOnce(&T) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(move |target_pinned: QObjectPinned<T>| {
+            let target_ref = target_pinned.borrow();
+            f(target_ref);
+        });
+        (*self.callback)(fb);
+    }
+
+    /// Call closure with a `&mut T` argument.
+    pub fn call_mut<F: FnOnce(&mut T) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(move |target_pinned: QObjectPinned<T>| {
+            let mut target_mut = target_pinned.borrow_mut();
+            f(&mut *target_mut);
+        });
+        (*self.callback)(fb);
     }
 }
 
