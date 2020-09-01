@@ -199,6 +199,7 @@ pub mod qtquickcontrols2;
 pub mod scenegraph;
 pub mod future;
 pub mod qttypes;
+pub mod plugin;
 
 cpp! {{
     #include <qmetaobject_rust.hpp>
