@@ -23,10 +23,12 @@ use std::ops::{Index, IndexMut};
 use std::os::raw::c_char;
 use std::str::Utf8Error;
 use std::mem::transmute;
-use std::fmt;
+use std::{cell::RefCell, fmt, ptr::null_mut};
 
 #[cfg(feature = "chrono_qdatetime")]
 use chrono::prelude::*;
+
+use crate::QObject;
 
 cpp_class!(
     /// Wrapper around Qt's QByteArray
@@ -519,6 +521,23 @@ impl QVariant {
 
     pub fn to_bool(&self) -> bool {
         unsafe { cpp!([self as "const QVariant*"] -> bool as "bool" { return self->toBool(); }) }
+    }
+
+    /// Create a new `QVariant` from a struct implementing `QObject`.
+    ///
+    /// # Panics
+    /// Panics when the C++ object has already been constructed.
+    pub fn from_new_qobject<O>(obj: O) -> Self 
+    where O: QObject + 'static 
+    {
+        unsafe {
+            assert!(obj.get_cpp_object() == null_mut(), "C++ object has already been constructed");
+            let pinned = Box::new(RefCell::new(obj));
+            O::cpp_construct(&pinned);
+            let qv = (&*pinned.borrow() as &dyn QObject).as_qvariant();
+            Box::into_raw(pinned);
+            qv
+        }        
     }
 }
 
