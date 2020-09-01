@@ -913,23 +913,23 @@ pub fn queued_callback<T: Send, F: FnMut(T) + 'static>(
 
 
 /// Calls a closure on the Qt event loop with a reference to a `QObject`.
-pub struct Callback<T: QObject + 'static> {
+pub struct QCallback<T: QObject + 'static> {
     callback: Arc<Box<dyn Fn(Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>) + Send + Sync>>,
 }
 
-impl<T: QObject + 'static> Clone for Callback<T> {
+impl<T: QObject + 'static> Clone for QCallback<T> {
     fn clone(&self) -> Self {
         Self { callback: self.callback.clone() }
     }
 }
 
-impl<T: QObject + 'static> Callback<T> {
+impl<T: QObject + 'static> QCallback<T> {
     /// Create with specified target QObject.
     ///
     /// Target QObject must have its C++ object created.
     pub fn new(target: &T) -> Self {
         let target_ptr = QPointer::from(&*target);
-        assert!(!target_ptr.is_null(), "Cannot create QtCallback for QObject with null C++ object");
+        assert!(!target_ptr.is_null(), "Cannot create QCallback for QObject with null C++ object");
         let callback = Box::new(queued_callback(move |f: Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>| {
             target_ptr.as_pinned().map(|target_pinned| {
                 f(target_pinned);
