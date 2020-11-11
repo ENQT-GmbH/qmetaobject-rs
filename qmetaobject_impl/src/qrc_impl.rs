@@ -321,7 +321,7 @@ impl Data {
     fn insert_file(&mut self, filename: &str) {
         let mut filepath = PathBuf::new();
 
-        if let Some(filename) = filename.strip_prefix("$OUT_DIR") {
+        if let Some(filename) = filename.strip_prefix("$OUT_DIR/") {
             if let Ok(out_dir) = env::var("OUT_DIR") {
                 filepath.push(out_dir);
             }
