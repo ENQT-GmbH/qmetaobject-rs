@@ -213,6 +213,20 @@ impl QmlEngine {
             self->engine->addImportPath(path);
         })
     }
+
+    /// Refreshes all binding expressions that use strings marked for translation.
+    ///
+    /// # Availability
+    ///
+    /// Only available in Qt 5.10 or above.
+    #[cfg(qt_5_10)]
+    pub fn retranslate(&self) {
+        cpp!(unsafe [self as "QmlEngineHolder *"] {
+            #if QT_VERSION >= QT_VERSION_CHECK(5,10,0)
+            self->engine->retranslate();
+            #endif
+        })
+    }
 }
 
 /// Bindings to a QQuickView

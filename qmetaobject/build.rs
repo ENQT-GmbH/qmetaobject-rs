@@ -68,6 +68,9 @@ fn main() {
         config.flag(qt_library_path.trim());
     }
 
+    if qt_version >= Version::new(5, 10, 0) {
+        println!("cargo:rustc-cfg=qt_5_10");
+    }    
     if qt_version >= Version::new(5, 14, 0) {
         println!("cargo:rustc-cfg=qt_5_14");
     }
