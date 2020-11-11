@@ -320,11 +320,18 @@ struct Data {
 impl Data {
     fn insert_file(&mut self, filename: &str) {
         let mut filepath = PathBuf::new();
-        if let Ok(cargo_manifest) = env::var("CARGO_MANIFEST_DIR") {
-            filepath.push(cargo_manifest);
-        }
 
-        filepath.push(filename);
+        if let Some(filename) = filename.strip_prefix("$OUT_DIR") {
+            if let Ok(out_dir) = env::var("OUT_DIR") {
+                filepath.push(out_dir);
+            }
+            filepath.push(filename);
+        } else {
+            if let Ok(cargo_manifest) = env::var("CARGO_MANIFEST_DIR") {
+                filepath.push(cargo_manifest);
+            }
+            filepath.push(filename);
+        }
 
         let mut data = fs::read(&filepath)
             .unwrap_or_else(|_| panic!("Cannot open file {}", filepath.display()));
