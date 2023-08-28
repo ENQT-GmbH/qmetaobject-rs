@@ -16,6 +16,8 @@ OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 use super::*;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hasher, Hash};
 use std::os::raw::c_void;
 
 /// A typed node in the scene graph
@@ -107,6 +109,12 @@ impl<A, T: Fn(SGNode<A>) -> SGNode<A>> UpdateNodeFnTuple<(A,)> for T {
     }
 }
 
+fn type_id_hash<T: std::any::Any>() -> u64 {
+    let mut s = DefaultHasher::new();
+    std::any::TypeId::of::<T>().hash(&mut s);
+    s.finish()
+}
+
 impl SGNode<ContainerNode> {
     /// Update the child nodes from an iterator.
     ///
@@ -139,7 +147,7 @@ impl SGNode<ContainerNode> {
         F: FnMut(<Iter as Iterator>::Item, SGNode<T>) -> SGNode<T>,
     {
         let mut raw = self.raw;
-        let type_id = std::any::TypeId::of::<T>();
+        let type_id = type_id_hash::<T>();
         let len = iter.len();
         assert!(len <= 64, "There is a limit of 64 child nodes");
         let mut mask = 0u64;
@@ -200,7 +208,7 @@ impl SGNode<ContainerNode> {
     /// # }
     ///  ```
     pub fn update_static<A: 'static, T: UpdateNodeFnTuple<A>>(&mut self, info: T) {
-        let type_id = std::any::TypeId::of::<A>();
+        let type_id = type_id_hash::<A>();
         let mut mask = 0u64;
         if self.raw.is_null() {
             self.raw = cpp!(unsafe [type_id as "quint64"] -> *mut c_void as "QSGNode*" {
