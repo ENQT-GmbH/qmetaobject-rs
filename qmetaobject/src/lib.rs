@@ -152,8 +152,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #![recursion_limit = "10240"]
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))] // Too many of that for qt types. (FIXME)
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::cognitive_complexity))]
+#![allow(clippy::needless_pass_by_value)] // Too many of that for qt types. (FIXME
+#![allow(clippy::cognitive_complexity)]
 
 #[macro_use]
 extern crate cpp;
@@ -254,6 +254,7 @@ pub struct QObjectDescription {
         trait_object_ptr: *const c_void,
         extra_destruct: extern "C" fn(*mut c_void),
     ),
+    #[allow(improper_ctypes_definitions)]
     pub get_rust_refcell: unsafe extern "C" fn(*mut c_void) -> *const RefCell<dyn QObject>,
 }
 
@@ -507,7 +508,7 @@ impl<'pin, T: QObject + ?Sized + 'pin> QObjectPinned<'pin, T> {
     /// Borrow the object
     // FIXME: there are too many cases for which we want reentrance after borrowing
     //pub fn borrow(&self) -> std::cell::Ref<T> { self.0.borrow() }
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::should_implement_trait))]
+    #[allow(clippy::should_implement_trait)]
     pub fn borrow(&self) -> &T {
         unsafe { &*self.0.as_ptr() }
     }
@@ -564,7 +565,7 @@ impl<T: QObject + ?Sized> QObjectBox<T> {
 pub fn into_leaked_cpp_ptr<T: QObject>(obj: T) -> *mut c_void {
     let b = Box::new(RefCell::new(obj));
     let obj_ptr = unsafe { QObject::cpp_construct(&b) };
-    std::boxed::Box::into_raw(b);
+    let _ = std::boxed::Box::into_raw(b);
     obj_ptr
 }
 
@@ -593,12 +594,14 @@ pub trait QEnum {
 
 #[doc(hidden)]
 #[no_mangle]
+#[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn RustObject_metaObject(p: *mut RefCell<dyn QObject>) -> *const QMetaObject {
     (*(*p).as_ptr()).meta_object()
 }
 
 #[doc(hidden)]
 #[no_mangle]
+#[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn RustObject_destruct(p: *mut RefCell<dyn QObject>) {
     // We are destroyed from the C++ code, which means that the object was owned by C++ and we
     // can destroy the rust object as well

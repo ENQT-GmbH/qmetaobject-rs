@@ -57,11 +57,17 @@ fn detect_qreal_size(qt_include_path: &str) {
 }
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(qt_5_10)");
+    println!("cargo::rustc-check-cfg=cfg(qt_5_14)");
+    println!("cargo::rustc-check-cfg=cfg(qreal_is_float)");
+
     let qt_include_path = qmake_query("QT_INSTALL_HEADERS");
     let qt_library_path = qmake_query("QT_INSTALL_LIBS");
     let qt_version =
         qmake_query("QT_VERSION").parse::<Version>().expect("Parsing Qt version failed");
+    
     let mut config = cpp_build::Config::new();
+    config.flag_if_supported("-Wno-deprecated-declarations");
 
     if cfg!(target_os = "macos") {
         config.flag("-F");

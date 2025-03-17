@@ -399,7 +399,7 @@ pub fn qml_register_type<T: QObject + Default + Sized>(
         }
         b.borrow_mut().init();
         Box::leak(b);
-    };
+    }
     let creator_fn: extern "C" fn(c: *mut c_void) = creator_fn::<T>;
 
     let size = T::cpp_size();
@@ -523,7 +523,7 @@ pub fn qml_register_singleton_type<T: QObject + Sized + Default>(
                 std::process::abort()
             }
         }
-    };
+    }
     let callback_fn: QmlRegisterSingletonTypeCallback = callback_fn::<T>;
 
     cpp!(unsafe [

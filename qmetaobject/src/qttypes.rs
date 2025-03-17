@@ -577,7 +577,7 @@ impl QVariant {
             let pinned = Box::new(RefCell::new(obj));
             O::cpp_construct(&pinned);
             let qv = (&*pinned.borrow() as &dyn QObject).as_qvariant();
-            Box::into_raw(pinned);
+            let _ = Box::into_raw(pinned);
             qv
         }        
     }
