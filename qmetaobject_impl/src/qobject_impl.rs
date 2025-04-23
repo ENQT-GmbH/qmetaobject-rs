@@ -564,7 +564,10 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
         }
     } else {
         quote! {
-            let mut obj = ::std::mem::transmute::<*mut ::std::os::raw::c_void, &mut #name #ty_generics>(o);
+            let mut obj: &mut #name #ty_generics = &mut *(::std::mem::transmute::<
+                *mut ::std::os::raw::c_void,
+                *mut #name #ty_generics,
+            >(o));
         }
     };
 
@@ -728,7 +731,7 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
                 // FIXME!  we should probably use the signature verbatim
                 let n = &arg.name;
                 let ty = &arg.typ;
-                quote! { #n : #ty }
+                quote! { mut #n : #ty }
             })
             .collect();
         let args_ptr: Vec<_> = signal
@@ -737,7 +740,9 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
             .map(|arg| {
                 let n = &arg.name;
                 let ty = &arg.typ;
-                quote! { unsafe { ::std::mem::transmute::<& #ty, *mut ::std::os::raw::c_void>(& #n) } }
+                quote! {
+                    (&mut #n as *mut #ty as *mut ::std::os::raw::c_void)
+                }
             })
             .collect();
         let array_size = signal.args.len() + 1;
@@ -890,7 +895,7 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
         } else {
             quote! {
                 fn init(&mut self) {}
-            }        
+            }
         }
     } else {
         quote! {}
@@ -953,7 +958,7 @@ pub fn generate(input: TokenStream, is_qobject: bool) -> TokenStream {
             }
 
             #qobject_spec_func
-            
+
             #init_func
 
         }
