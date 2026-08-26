@@ -176,6 +176,7 @@ macro_rules! qmetaobject_lazy_static { ($($t:tt)*) => { $crate::lazy_static!($($
 use std::cell::{RefCell, RefMut};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
+use std::ptr::null_mut;
 
 use cpp::{cpp, cpp_class};
 
@@ -199,6 +200,7 @@ pub mod future;
 pub mod itemmodel;
 pub mod listmodel;
 pub mod log;
+pub mod plugin;
 pub mod qmetatype;
 pub mod qrc;
 pub mod qtcore;
@@ -222,7 +224,7 @@ pub mod prelude {
         qml_register_type, qrc, qt_base_class, qt_method, qt_plugin, qt_property, qt_signal,
         QAbstractListModel, QByteArray, QColor, QDate, QDateTime, QEnum, QModelIndex, QObject,
         QObjectBox, QPointer, QQmlExtensionPlugin, QQuickItem, QQuickView, QRectF, QString, QTime,
-        QVariant, QmlEngine,
+        QVariant, QVariantQObjectExt, QmlEngine,
     };
 }
 
@@ -347,6 +349,51 @@ pub trait QObject {
             })
         }
     }
+    /// Returns a reference to a QObject stored in an QVariant.
+    unsafe fn from_qvariant<'a>(qv: &'a QVariant) -> QObjectPinned<'a, Self>
+    where
+        Self: Sized,
+    {
+        let self_ = cpp! {[qv as "const QVariant*"] -> *mut c_void as "QObject*" {
+            return qv->value<QObject *>();
+        }};
+        Self::get_from_cpp(self_)
+    }
+
+    /// Initializes the QML object after C++ object creation.
+    fn init(&mut self);
+}
+
+pub trait QVariantQObjectExt {
+    /// Create a new `QVariant` from a struct implementing `QObject`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the C++ object has already been constructed.
+    fn from_qobject<O>(obj: O) -> Self
+    where
+        O: QObject + 'static;
+}
+
+impl QVariantQObjectExt for QVariant {
+    fn from_qobject<O>(obj: O) -> Self
+    where
+        O: QObject + 'static,
+    {
+        unsafe {
+            assert!(obj.get_cpp_object() == null_mut(), "C++ object has already been constructed");
+
+            let pinned = Box::new(RefCell::new(obj));
+            O::cpp_construct(&pinned);
+
+            let qv = (&*pinned.borrow() as &dyn QObject).as_qvariant();
+
+            // Ownership has effectively been transferred to the C++/QObject side.
+            let _ = Box::into_raw(pinned);
+
+            qv
+        }
+    }
 }
 
 impl dyn QObject {
@@ -391,6 +438,18 @@ impl dyn QObject {
             }))
         }
     }
+}
+
+/// Initialization of an QML object.
+pub trait QObjectInit {
+    /// Initialize the QML object.
+    ///
+    /// Will be called on a default-constructed object after the C++ object
+    /// has been created.
+    ///
+    /// # Panics
+    /// The process will be aborted when the method panics.
+    fn init(&mut self);
 }
 
 cpp_class!(unsafe struct QPointerImpl as "QPointer<QObject>");
@@ -886,7 +945,7 @@ where
 /// given closure in the current Qt thread.
 ///
 /// If the current thread does no longer have an event loop when the callback is sent, the
-/// callback will not be recieved.
+/// callback will not be received.
 ///
 /// ```
 /// use qmetaobject::queued_callback;
@@ -938,6 +997,59 @@ pub fn queued_callback<T: Send, F: FnMut(T) + 'static>(
                 invokeMethod(qApp, std::move(func_raw));
             }
         });
+    }
+}
+
+/// Calls a closure on the Qt event loop with a reference to a `QObject`.
+pub struct QCallback<T: QObject + 'static> {
+    callback:
+        std::sync::Arc<Box<dyn Fn(Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>) + Send + Sync>>,
+}
+
+impl<T: QObject + 'static> Clone for QCallback<T> {
+    fn clone(&self) -> Self {
+        Self { callback: self.callback.clone() }
+    }
+}
+
+impl<T: QObject + 'static> QCallback<T> {
+    /// Create with specified target QObject.
+    ///
+    /// Target QObject must have its C++ object created.
+    pub fn new(target: &T) -> Self {
+        let target_ptr = QPointer::from(&*target);
+        assert!(!target_ptr.is_null(), "Cannot create QCallback for QObject with null C++ object");
+        let callback =
+            Box::new(queued_callback(move |f: Box<dyn FnOnce(QObjectPinned<T>) -> () + Send>| {
+                target_ptr.as_pinned().map(|target_pinned| {
+                    f(target_pinned);
+                });
+            }));
+        Self { callback: std::sync::Arc::new(callback) }
+    }
+
+    /// Call closure with a `QObjectPinned<T>` argument.
+    pub fn call<F: FnOnce(QObjectPinned<T>) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(f);
+        (*self.callback)(fb);
+    }
+
+    /// Call closure with a `&T` argument.
+    pub fn call_ref<F: FnOnce(&T) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(move |target_pinned: QObjectPinned<T>| {
+            let target_ref = target_pinned.borrow();
+            f(target_ref);
+        });
+        (*self.callback)(fb);
+    }
+
+    /// Call closure with a `&mut T` argument.
+    pub fn call_mut<F: FnOnce(&mut T) -> () + Send + 'static>(&self, f: F) {
+        let fb = Box::new(move |target_pinned: QObjectPinned<T>| {
+            let mut target_mut = target_pinned.borrow_mut();
+            f(&mut *target_mut);
+        });
+        (*self.callback)(fb);
     }
 }
 

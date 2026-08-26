@@ -95,6 +95,24 @@ impl QVariant {
     }
 
     // FIXME: do more wrappers
+
+    // /// Create a new `QVariant` from a struct implementing `QObject`.
+    // ///
+    // /// # Panics
+    // /// Panics when the C++ object has already been constructed.
+    // pub fn from_qobject<O>(obj: O) -> Self
+    // where
+    //     O: QObject + 'static,
+    // {
+    //     unsafe {
+    //         assert!(obj.get_cpp_object() == null_mut(), "C++ object has already been constructed");
+    //         let pinned = Box::new(RefCell::new(obj));
+    //         O::cpp_construct(&pinned);
+    //         let qv = (&*pinned.borrow() as &dyn QObject).as_qvariant();
+    //         let _ = Box::into_raw(pinned);
+    //         qv
+    //     }
+    // }
 }
 
 impl fmt::Debug for QVariant {

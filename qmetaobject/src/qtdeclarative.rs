@@ -248,7 +248,7 @@ impl QmlEngine {
             if (robjs.isEmpty()) {
                 return;
             }
-            
+
             #define INVOKE_METHOD(...) QMetaObject::invokeMethod(robjs.first(), name __VA_ARGS__);
             switch (args_size) {
                 case 0: INVOKE_METHOD(); break;
@@ -277,7 +277,7 @@ impl QmlEngine {
             self->engine->clearComponentCache();
         })
     }
-    
+
     /// Give a QObject to the engine by wrapping it in a QJSValue
     ///
     /// This will create the C++ object.
@@ -478,6 +478,7 @@ pub fn qml_register_type<T: QObject + Default + Sized>(
         unsafe {
             T::qml_construct(&b, c, ed);
         }
+        b.borrow_mut().init();
         Box::leak(b);
     }
     let creator_fn: extern "C" fn(c: *mut c_void, #[cfg(qt_6_0)] _: *mut c_void) = creator_fn::<T>;
@@ -585,18 +586,6 @@ cpp! {{
     using QmlRegisterSingletonTypeCallback = QObject *(*)(QQmlEngine *, QJSEngine *);
 }}
 
-/// Initialization for singleton QML objects.
-pub trait QSingletonInit {
-    /// Initialize the singleton QML object.
-    ///
-    /// Will be called on a default-constructed object after the C++ object
-    /// has been created.
-    ///
-    /// # Panics
-    /// The process will be aborted when the method panics.
-    fn init(&mut self);
-}
-
 /// Register the specified type as a singleton QML object.
 ///
 /// A new object will be default-constructed for each new instance of `QmlEngine`.
@@ -610,7 +599,7 @@ pub trait QSingletonInit {
 /// The process will be aborted when the default or init functions panic.
 ///
 /// [qt]: https://doc.qt.io/qt-5/qqmlengine.html#qmlRegisterSingletonType-3
-pub fn qml_register_singleton_type<T: QObject + QSingletonInit + Sized + Default>(
+pub fn qml_register_singleton_type<T: QObject + Sized + Default>(
     uri: &CStr,
     version_major: u32,
     version_minor: u32,
@@ -620,7 +609,7 @@ pub fn qml_register_singleton_type<T: QObject + QSingletonInit + Sized + Default
     let qml_name_ptr = qml_name.as_ptr();
     let meta_object = T::static_meta_object();
 
-    extern "C" fn callback_fn<T: QObject + Default + Sized + QSingletonInit>(
+    extern "C" fn callback_fn<T: QObject + Default + Sized>(
         _qml_engine: *mut c_void,
         _js_engine: *mut c_void,
     ) -> *mut c_void {

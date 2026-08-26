@@ -412,6 +412,19 @@ fn map_method_parameters2(
         .collect()
 }
 
+fn has_init_attr(input: &syn::DeriveInput) -> bool {
+    for i in input.attrs.iter() {
+        let syn::Meta::Path(path) = &i.meta else {
+            continue;
+        };
+        if path.is_ident("QObjectInit") {
+            return true;
+        }
+    }
+    false
+    // input.attrs.iter().any(|attr| attr.path().is_ident("QObjectInit"))
+}
+
 pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
@@ -425,6 +438,7 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
     let mut plugin_iid: Option<syn::LitStr> = None;
 
     let crate_ = super::get_crate(&ast);
+    let has_init_attr = has_init_attr(&ast);
     let mut base: syn::Ident = parse_quote!(QGadget);
     let mut base_prop: syn::Ident = parse_quote!(missing_base_class_property);
     let mut has_base_property = false;
@@ -688,7 +702,10 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
     } else {
         quote! {
             #[allow(unused_variables)]
-            let mut obj = ::std::mem::transmute::<*mut ::std::os::raw::c_void, &mut #name #ty_generics>(o);
+            let mut obj: &mut #name #ty_generics = &mut *(::std::mem::transmute::<
+                *mut ::std::os::raw::c_void,
+                *mut #name #ty_generics,
+            >(o));
         }
     };
 
@@ -868,7 +885,7 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
                 // FIXME!  we should probably use the signature verbatim
                 let n = &arg.name;
                 let ty = &arg.typ;
-                quote! { #n : #ty }
+                quote! { mut #n : #ty }
             })
             .collect();
         let args_ptr: Vec<_> = signal
@@ -877,7 +894,9 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
             .map(|arg| {
                 let n = &arg.name;
                 let ty = &arg.typ;
-                quote! { unsafe { ::std::mem::transmute::<& #ty, *mut ::std::os::raw::c_void>(& #n) } }
+                quote! {
+                    (&mut #n as *mut #ty as *mut ::std::os::raw::c_void)
+                }
             })
             .collect();
         let array_size = signal.args.len() + 1;
@@ -1025,6 +1044,22 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
         quote! {}
     };
 
+    let init_func = if is_qobject {
+        if has_init_attr {
+            quote! {
+                fn init(&mut self) {
+                    <Self as QObjectInit>::init(self)
+                }
+            }
+        } else {
+            quote! {
+                fn init(&mut self) {}
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let trait_name = if is_qobject {
         quote! { QObject }
     } else {
@@ -1099,6 +1134,7 @@ pub fn generate(input: TokenStream, is_qobject: bool, qt_version: QtVersion) -> 
 
             #qobject_spec_func
 
+            #init_func
         }
 
     };

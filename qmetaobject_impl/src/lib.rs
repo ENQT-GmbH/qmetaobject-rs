@@ -57,13 +57,13 @@ fn get_crate(input: &DeriveInput) -> impl ToTokens {
 }
 
 /// Implementation of #[derive(QObject)]
-#[proc_macro_derive(QObject, attributes(QMetaObjectCrate, qt_base_class))]
+#[proc_macro_derive(QObject, attributes(QMetaObjectCrate, QObjectInit, qt_base_class))]
 pub fn qobject_impl(input: TokenStream) -> TokenStream {
     qobject_impl::generate(input, true, 5)
 }
 
 /// Implementation of #[derive(QObject)]
-#[proc_macro_derive(QObject6, attributes(QMetaObjectCrate, qt_base_class))]
+#[proc_macro_derive(QObject6, attributes(QMetaObjectCrate, QObjectInit, qt_base_class))]
 pub fn qobject_impl6(input: TokenStream) -> TokenStream {
     qobject_impl::generate(input, true, 6)
 }
