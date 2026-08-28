@@ -2,6 +2,7 @@ use crate::internal_prelude::*;
 use crate::qtcore::{QByteArray, QUrl, UnicodeVersion};
 
 use std::convert::TryFrom;
+use std::ffi::CStr;
 use std::fmt::Display;
 use std::ops::{Add, AddAssign};
 use std::path::{Path, PathBuf};
@@ -221,6 +222,16 @@ impl<'a> From<&'a str> for QString {
     }
 }
 
+impl<'a> From<&'a CStr> for QString {
+    /// Copy the data from a `&str`.
+    fn from(s: &'a CStr) -> QString {
+        let ptr = s.as_ptr();
+        cpp!(unsafe [ptr as "const char*"] -> QString as "QString" {
+            return QString(ptr);
+        })
+    }
+}
+
 impl TryFrom<&Path> for QString {
     type Error = ();
 
@@ -417,6 +428,16 @@ mod tests {
         let from_empty_string = QString::from(String::new());
         assert_eq!(from_empty_string.to_string(), "");
         assert!(from_empty_string.is_empty());
+    }
+
+    #[test]
+    fn from_cstr() {
+        let from_str = QString::from(c"hello");
+        assert_eq!(from_str.to_string(), "hello");
+
+        let from_empty_str = QString::from(c"");
+        assert_eq!(from_empty_str.to_string(), "");
+        assert!(from_empty_str.is_empty());
     }
 
     #[test]
