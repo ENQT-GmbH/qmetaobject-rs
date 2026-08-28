@@ -237,6 +237,7 @@ impl QDate {
         })
     }
 }
+
 #[cfg(feature = "chrono")]
 impl From<NaiveDate> for QDate {
     fn from(a: NaiveDate) -> QDate {
@@ -248,6 +249,19 @@ impl Into<NaiveDate> for QDate {
     fn into(self) -> NaiveDate {
         let (y, m, d) = self.get_y_m_d();
         NaiveDate::from_ymd(y, m as u32, d as u32)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl From<NaiveDateTime> for QDateTime {
+    fn from(a: NaiveDateTime) -> QDateTime {
+        QDateTime::from_date_time_local_timezone(a.date().into(), a.time().into())
+    }
+}
+#[cfg(feature = "chrono")]
+impl Into<NaiveDateTime> for QDateTime {
+    fn into(self) -> NaiveDateTime {
+        NaiveDateTime::new(self.get_date().into(), self.get_time().into())
     }
 }
 

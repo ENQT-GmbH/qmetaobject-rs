@@ -85,6 +85,15 @@ impl QVariant {
         })
     }
 
+    /// Wrapper around [`toInt()`][method] method.
+    ///
+    /// [method]: https://doc.qt.io/qt-5/qvariant.html#toInt
+    pub fn to_double(&self) -> f64 {
+        cpp!(unsafe [self as "const QVariant*"] -> f64 as "double" {
+            return self->toDouble();
+        })
+    }
+
     /// Wrapper around ['typeName()`][method] method.
     ///
     /// [method]: https://doc.qt.io/qt-5/qvariant.html#typeName

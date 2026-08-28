@@ -305,6 +305,21 @@ impl QmlEngine {
             return self->engine.get();
         })
     }
+
+    ///
+    /// Refreshes all binding expressions that use strings marked for translation.
+    ///
+    /// # Availability
+    ///
+    /// Only available in Qt 5.10 or above.
+    #[cfg(qt_5_10)]
+    pub fn retranslate(&self) {
+        cpp!(unsafe [self as "QmlEngineHolder *"] {
+            #if QT_VERSION >= QT_VERSION_CHECK(5,10,0)
+            self->engine->retranslate();
+            #endif
+        })
+    }
 }
 
 /// Bindings to a QQuickView
@@ -1256,4 +1271,30 @@ pub trait QQuickPaintedItem: QQuickItem {
     }
 
     fn paint(&mut self, _p: &mut QPainter) {}
+
+    /// Schedules a redraw of the area covered by this item.
+    fn update(&mut self) {
+        let obj_ptr = self.get_cpp_object();
+        unsafe {
+            cpp!([obj_ptr as "QQuickPaintedItem*"] {
+                obj_ptr->update();
+            });
+        }
+    }
+
+    /// The width of this item.
+    fn width(&self) -> f64 {
+        let obj_ptr = self.get_cpp_object();
+        cpp! {unsafe [obj_ptr as "QQuickPaintedItem*"] -> f64 as "double" {
+            return obj_ptr->width();
+        }}
+    }
+
+    /// The height of this item.
+    fn height(&self) -> f64 {
+        let obj_ptr = self.get_cpp_object();
+        cpp! {unsafe [obj_ptr as "QQuickPaintedItem*"] -> f64 as "double" {
+            return obj_ptr->height();
+        }}
+    }
 }

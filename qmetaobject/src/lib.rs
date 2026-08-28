@@ -671,12 +671,14 @@ pub trait QEnum {
 
 #[doc(hidden)]
 #[no_mangle]
+#[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn RustObject_metaObject(p: *mut RefCell<dyn QObject>) -> *const QMetaObject {
     (*(*p).as_ptr()).meta_object()
 }
 
 #[doc(hidden)]
 #[no_mangle]
+#[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn RustObject_destruct(p: *mut RefCell<dyn QObject>) {
     // We are destroyed from the C++ code, which means that the object was owned by C++ and we
     // can destroy the rust object as well
