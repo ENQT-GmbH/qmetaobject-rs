@@ -201,7 +201,7 @@ pub trait SimpleListItem {
 }
 
 /// A simple QAbstractListModel which just wrap a vector of items.
-#[derive(QObject, Default)]
+#[derive(QObject)]
 // This is a bit weird because the rules are different as we are in the qmetaobject crate
 #[QMetaObjectCrate = "super"]
 pub struct SimpleListModel<T: SimpleListItem + 'static> {
@@ -209,6 +209,15 @@ pub struct SimpleListModel<T: SimpleListItem + 'static> {
     #[qt_base_class = "QAbstractListModel"]
     base: QObjectCppWrapper,
     values: Vec<T>,
+}
+
+impl<T: SimpleListItem + 'static> Default for SimpleListModel<T> {
+    fn default() -> SimpleListModel<T> {
+        SimpleListModel {
+            base: Default::default(),
+            values: Default::default(),
+        }
+    }
 }
 
 impl<T> QAbstractListModel for SimpleListModel<T>
@@ -263,7 +272,7 @@ impl<T: SimpleListItem> SimpleListModel<T> {
 
 impl<T> FromIterator<T> for SimpleListModel<T>
 where
-    T: SimpleListItem + Default,
+    T: SimpleListItem
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> SimpleListModel<T> {
         let mut m = SimpleListModel::default();
@@ -273,7 +282,7 @@ where
 }
 impl<'a, T> FromIterator<&'a T> for SimpleListModel<T>
 where
-    T: SimpleListItem + Default + Clone,
+    T: SimpleListItem + Clone,
 {
     fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> SimpleListModel<T> {
         let mut m = SimpleListModel::<T>::default();
