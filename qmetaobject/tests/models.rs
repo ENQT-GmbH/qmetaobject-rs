@@ -27,7 +27,7 @@ use std::iter::FromIterator;
 
 #[test]
 fn simple_model() {
-    #[derive(Default, SimpleListItem)]
+    #[derive(SimpleListItem)]
     struct TM {
         pub a: QString,
         pub b: u32,
@@ -65,7 +65,7 @@ fn simple_model_remove() {
         }),
     }
 
-    #[derive(Debug, Clone, SimpleListItem, Default)]
+    #[derive(Debug, Clone, SimpleListItem)]
     pub struct X {
         pub val: usize,
     }
@@ -118,7 +118,7 @@ fn simple_model_iter() {
         pub list: qt_property!(RefCell<SimpleListModel<X>>; CONST),
     }
 
-    #[derive(Debug, Clone, SimpleListItem, Default, PartialEq)]
+    #[derive(Debug, Clone, SimpleListItem, PartialEq)]
     pub struct X {
         pub val: usize,
     }
